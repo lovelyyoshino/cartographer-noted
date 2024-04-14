@@ -24,6 +24,9 @@ message PoseGraphOptions {
   // is built.
   int32 optimize_every_n_nodes = 1;
 
+  //okagv
+  double optimize_every_meter = 2;
+
   // Options for the constraint builder.
   mapping.constraints.proto.ConstraintBuilderOptions
       constraint_builder_options = 3;
@@ -55,6 +58,9 @@ message PoseGraphOptions {
   // added between two trajectories, loop closure searches will be performed
   // globally rather than in a smaller search window.
   double global_constraint_search_after_n_seconds = 10;
+
+  //okagv
+  double local_constraint_search_after_n_seconds = 12;
 
   message OverlappingSubmapsTrimmerOptions2D {
     int32 fresh_submaps_count = 1;

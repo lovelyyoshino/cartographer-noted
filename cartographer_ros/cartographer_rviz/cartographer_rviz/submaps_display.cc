@@ -126,12 +126,14 @@ void SubmapsDisplay::processMessage(
     }
     const auto& trajectory_submaps = trajectories_[trajectory_id]->submaps;
     const auto it = trajectory_submaps.find(submap_entry.submap_index);
+    
     if (it != trajectory_submaps.end() &&
         it->second->version() > submap_entry.submap_version) {
       // Versions should only increase unless Cartographer restarted.
       trajectories_.clear();
       break;
     }
+    
   }
   using ::cartographer::mapping::SubmapId;
   std::set<SubmapId> listed_submaps;
@@ -160,9 +162,10 @@ void SubmapsDisplay::processMessage(
     auto& pose_markers_visibility =
         trajectories_[id.trajectory_id]->pose_markers_visibility;
     if (trajectory_submaps.count(id.submap_index) == 0) {
+      //LOG(INFO) << "Peak.ding trajectory_submaps " << id;
       // TODO(ojura): Add RViz properties for adjusting submap pose axes
-      constexpr float kSubmapPoseAxesLength = 0.3f;
-      constexpr float kSubmapPoseAxesRadius = 0.06f;
+      constexpr float kSubmapPoseAxesLength = 0.3f;  //0.3f
+      constexpr float kSubmapPoseAxesRadius = 0.06f; //0.06f
       trajectory_submaps.emplace(
           id.submap_index,
           absl::make_unique<DrawableSubmap>(
@@ -237,7 +240,8 @@ void SubmapsDisplay::update(const float wall_dt, const float ros_dt) {
       }
     }
   } catch (const tf2::TransformException& ex) {
-    ROS_WARN_THROTTLE(1., "Could not compute submap fading: %s", ex.what());
+    //okagv
+    //ROS_WARN_THROTTLE(1., "Could not compute submap fading: %s", ex.what());
   }
   // Update the map frame to fixed frame transform.
   Ogre::Vector3 position;

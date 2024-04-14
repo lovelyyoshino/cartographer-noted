@@ -16,9 +16,9 @@
 
 #include "cartographer/mapping/pose_extrapolator_interface.h"
 
-#include "cartographer/common/internal/ceres_solver_options.h"
+#include "cartographer/common/ceres_solver_options.h"
 #include "cartographer/common/time.h"
-#include "cartographer/mapping/internal/imu_based_pose_extrapolator.h"
+#include "cartographer/mapping/imu_based_pose_extrapolator.h"
 #include "cartographer/mapping/pose_extrapolator.h"
 
 namespace cartographer {
@@ -84,6 +84,8 @@ PoseExtrapolatorInterface::CreateWithImuData(
     const std::vector<sensor::ImuData>& imu_data,
     const std::vector<transform::TimestampedTransform>& initial_poses) {
   CHECK(!imu_data.empty());
+  // TODO(schwoere): Implement/integrate imu based extrapolator.
+  CHECK(!options.use_imu_based()) << "Not implemented!";
   if (options.use_imu_based()) {
     return ImuBasedPoseExtrapolator::InitializeWithImu(options.imu_based(),
                                                        imu_data, initial_poses);

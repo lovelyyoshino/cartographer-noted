@@ -37,6 +37,10 @@ class RangeDataInserterInterface {
   // Inserts 'range_data' into 'grid'.
   virtual void Insert(const sensor::RangeData& range_data,
                       GridInterface* grid) const = 0;
+
+  //okagv
+  virtual void InsertForIntensity(const sensor::RangeData& range_data,
+                      GridInterface* grid) const = 0;
 };
 
 }  // namespace mapping

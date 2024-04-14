@@ -115,6 +115,7 @@ void Node::HandleSubmapList(
 
   for (const auto& submap_msg : msg->submap) {
     const SubmapId id{submap_msg.trajectory_id, submap_msg.submap_index};
+    //LOG(INFO) << "Peak.ding HandleSubmapList " << id;
     submap_ids_to_delete.erase(id);
     if ((submap_msg.is_frozen && !FLAGS_include_frozen_submaps) ||
         (!submap_msg.is_frozen && !FLAGS_include_unfrozen_submaps)) {

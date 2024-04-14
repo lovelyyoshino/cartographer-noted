@@ -30,6 +30,24 @@ mapping::MapBuilderInterface& MapBuilderContext<SubmapType>::map_builder() {
   return *map_builder_server_->map_builder_;
 }
 
+// okagv
+template <class SubmapType>
+int MapBuilderContext<SubmapType>::GetTrajectoryIdByName(std::string name) {
+  for (auto& item : client_ids_) {
+    if (item.second == name) {
+      return item.first;
+    }
+  }
+
+  return -1;
+}
+
+// okagv
+template <class SubmapType>
+std::string MapBuilderContext<SubmapType>::GetRootFileDirectory() {
+  return map_builder_server_->root_file_directory;
+}
+
 template <class SubmapType>
 common::BlockingQueue<std::unique_ptr<MapBuilderContextInterface::Data>>&
 MapBuilderContext<SubmapType>::sensor_data_queue() {

@@ -29,13 +29,13 @@ FixedRatioSampler::FixedRatioSampler(const double ratio) : ratio_(ratio) {
 
 FixedRatioSampler::~FixedRatioSampler() {}
 
-bool FixedRatioSampler::Pulse() {                                              //实际采样率 比设定小 返回true
-  ++num_pulses_;  
+bool FixedRatioSampler::Pulse() {
+  ++num_pulses_;
   if (static_cast<double>(num_samples_) / num_pulses_ < ratio_) {
     ++num_samples_;
     return true;
   }
-  return false;                                                                 //实际采样率 比设定大 返回false
+  return false;
 }
 
 std::string FixedRatioSampler::DebugString() {

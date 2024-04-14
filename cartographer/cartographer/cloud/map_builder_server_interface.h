@@ -52,7 +52,7 @@ void RegisterMapBuilderServerMetrics(metrics::FamilyFactory* factory);
 // Returns MapBuilderServer with the actual implementation.
 std::unique_ptr<MapBuilderServerInterface> CreateMapBuilderServer(
     const proto::MapBuilderServerOptions& map_builder_server_options,
-    std::unique_ptr<mapping::MapBuilderInterface> map_builder);
+    std::shared_ptr<mapping::MapBuilderInterface> map_builder);
 
 }  // namespace cloud
 }  // namespace cartographer

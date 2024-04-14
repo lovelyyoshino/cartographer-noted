@@ -36,9 +36,9 @@
 #include "cartographer/mapping/internal/constraints/constraint_builder_3d.h"
 #include "cartographer/mapping/internal/optimization/optimization_problem_3d.h"
 #include "cartographer/mapping/internal/trajectory_connectivity_state.h"
-#include "cartographer/mapping/internal/pose_graph_data.h"
 #include "cartographer/mapping/internal/work_queue.h"
 #include "cartographer/mapping/pose_graph.h"
+#include "cartographer/mapping/pose_graph_data.h"
 #include "cartographer/mapping/pose_graph_trimmer.h"
 #include "cartographer/metrics/family_factory.h"
 #include "cartographer/sensor/fixed_frame_pose_data.h"
@@ -130,6 +130,19 @@ class PoseGraph3D : public PoseGraph {
       LOCKS_EXCLUDED(mutex_);
   std::map<std::string, transform::Rigid3d> GetLandmarkPoses() const override
       LOCKS_EXCLUDED(mutex_);
+      //okagv
+    std::map<std::string, transform::Rigid3d> GetLandmarkPosesWithId(int trajectory_id) const override
+    LOCKS_EXCLUDED(mutex_);
+    //okagv
+      MapById<SubmapId, SubmapData> GetAllSubmapDataAfterUpdate() const
+      LOCKS_EXCLUDED(mutex_) override;
+    //okagv
+      MapById<NodeId, TrajectoryNode> GetTrajectoryNodesAfterUpdate() const override
+      LOCKS_EXCLUDED(mutex_);
+    //okagv
+    std::map<std::string, transform::Rigid3d> GetLandmarkPosesAfterUpdate() const override
+    LOCKS_EXCLUDED(mutex_);
+
   void SetLandmarkPose(const std::string& landmark_id,
                        const transform::Rigid3d& global_pose,
                        const bool frozen = false) override
@@ -145,6 +158,13 @@ class PoseGraph3D : public PoseGraph {
   std::map<int, TrajectoryData> GetTrajectoryData() const override;
 
   std::vector<Constraint> constraints() const override LOCKS_EXCLUDED(mutex_);
+  //okagv
+  std::vector<Constraint> constraintsWithId(int trajectory_id) const override LOCKS_EXCLUDED(mutex_);
+  //okagv
+    std::map<int, TrajectoryData> GetTrajectoryDataAfterUpdate() const override;
+  //okagv
+    std::vector<Constraint> constraintsAfterUpdate() const override LOCKS_EXCLUDED(mutex_);
+
   void SetInitialTrajectoryPose(int from_trajectory_id, int to_trajectory_id,
                                 const transform::Rigid3d& pose,
                                 const common::Time time) override
@@ -156,6 +176,61 @@ class PoseGraph3D : public PoseGraph {
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
+
+  //okagv
+  OKagvOrder GetOKagv_Order() const override
+  LOCKS_EXCLUDED(mutex_);
+
+  void SetOKagv_Order(const OKagvOrder& order) override
+  LOCKS_EXCLUDED(mutex_);
+
+  //okagv
+  OKagvFeedback GetOKagv_Feedback() const override
+  LOCKS_EXCLUDED(mutex_);
+
+  void SetOKagv_Feedback(const OKagvFeedback& feedback) override
+  LOCKS_EXCLUDED(mutex_);
+
+  bool LocalizeOKagvPoses(const bool use_initial_pose,
+                          const int trajectory_id,
+                          const transform::Rigid3d initial_pose) override;
+
+  //okagv
+  bool IsTrajectoryExist(int trajectory_id) const override;
+
+  //okagv
+  void GetCovarianceScore(double& score, bool& is_update) override;
+
+  //okagv
+  void SetCovarianceScore(double score) override;
+
+      //okagv
+    void SetTrajectoryState(int trajectory_id, TrajectoryState state) override;
+
+    //okagv
+    void SetWorkingTrajectoryType(uint8_t type) override;
+
+          //okagv
+    uint8_t GetWorkingTrajectoryType() override;
+
+        //okagv
+    void SetConstraintBuilderMinScore(double score) override;
+
+    //okagv
+    sensor::MapByTime<sensor::ImuData> GetImuDataAfterUpdate() const override
+    LOCKS_EXCLUDED(mutex_);
+
+    // okagv
+    void StopDrainWorkQueue() override;
+    // okagv
+    void StartDrainWorkQueue() override;
+    // okagv
+    void SetThreadPoolState(mapping::PoseGraphInterface::ThreadPoolState type) override;
+    // okagv
+    mapping::PoseGraphInterface::ThreadPoolState GetThreadPoolState() override;
+
+    //okagv
+    void SetPoseGraphOption(proto::PoseGraphOptions& option_reset) override;
 
  protected:
   // Waits until we caught up (i.e. nothing is waiting to be scheduled), and
@@ -268,6 +343,15 @@ class PoseGraph3D : public PoseGraph {
 
   PoseGraphData data_ GUARDED_BY(mutex_);
 
+  //okagv
+  mapping::PoseGraphInterface::OKagvOrder current_okagv_order_ =
+          mapping::PoseGraphInterface::OKagvOrder::WAIT;
+  //okagv
+  mapping::PoseGraphInterface::OKagvFeedback current_okagv_feedback_;
+
+  //okagv
+  double covariance_score_ = 0.0;
+
   // Allows querying and manipulating the pose graph by the 'trimmers_'. The
   // 'mutex_' of the pose graph is held while this class is used.
   class TrimmingHandle : public Trimmable {
@@ -290,6 +374,13 @@ class PoseGraph3D : public PoseGraph {
 
     void SetTrajectoryState(int trajectory_id, TrajectoryState state) override
         EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_);
+
+    //okagv
+    std::vector<NodeId> GetNodeIds(int trajectory_id) const override;
+
+    //okagv
+    void TrimNode(const NodeId& node_id)
+    EXCLUSIVE_LOCKS_REQUIRED(parent_->mutex_) override;
 
    private:
     PoseGraph3D* const parent_;

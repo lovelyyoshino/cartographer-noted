@@ -27,4 +27,6 @@ message MapBuilderServerOptions {
   int32 upload_batch_size = 6;
   bool enable_ssl_encryption = 7;
   bool enable_google_auth = 9;
+  //okagv
+  string root_file_directory = 10;
 }

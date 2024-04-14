@@ -234,6 +234,8 @@ message WriteStateToFileRequest {
 
 message WriteStateToFileResponse {
   bool success = 1;
+  int32 code = 2;
+  string message = 3;
 }
 
 message IsTrajectoryFinishedRequest {
@@ -250,6 +252,69 @@ message IsTrajectoryFrozenRequest {
 
 message IsTrajectoryFrozenResponse {
   bool is_frozen = 1;
+}
+
+//okagv
+message OKagv_StartTrajectoryResponse {
+  bool state = 1;
+  int32 code = 2;
+  string message = 3;
+}
+
+//okagv
+message OKagv_FinishTrajectoryResponse {
+  bool state = 1;
+}
+
+//okagv
+message OKagv_WaitTrajectoryResponse {
+  bool state = 1;
+}
+
+//okagv
+message OKagv_GetOrderResponse {
+  int32 order_type = 1;
+}
+
+//okagv
+message OKagv_LoadTrajectoryRequest {
+  string filename = 1;
+}
+
+//okagv
+message OKagv_LoadTrajectoryResponse {
+  bool state = 1;
+}
+
+//okagv
+message OKagv_LocalizeTrajectoryRequest{
+  bool use_initial_pose = 1;
+  cartographer.transform.proto.Rigid3d initial_pose = 2;
+}
+message OKagv_LocalizeTrajectoryResponse {
+  bool state = 1;
+  int32 confidence_score = 2;
+}
+
+//okagv
+message OKagv_StartTrajectoryRequest{
+  string trajectory_type = 1;
+  string trajectory_id = 2;
+  bool use_initial_pose = 3;
+  cartographer.transform.proto.Rigid3d initial_pose = 4;
+  string relative_to_trajectory_id = 5;
+}
+
+//okagv
+message OKagv_SaveTrajectoryRequest{
+  string filename = 1;
+  bool include_unfinished_submaps = 2;
+}
+
+//okagv
+message OKagv_GetTrajectoryStateResponse{
+  int32 code = 1;
+  string message = 2;
 }
 
 service MapBuilderService {
@@ -351,4 +416,37 @@ service MapBuilderService {
   // Writes the serialized SLAM state to the host file system.
   rpc WriteStateToFile(WriteStateToFileRequest)
       returns (WriteStateToFileResponse);
+
+  //okagv
+  rpc OKagv_StartTrajectory(OKagv_StartTrajectoryRequest)
+      returns (OKagv_StartTrajectoryResponse);
+
+  //okagv
+  rpc OKagv_FinishTrajectory(google.protobuf.Empty)
+      returns (OKagv_FinishTrajectoryResponse);
+
+  //okagv
+ rpc OKagv_WaitTrajectory(google.protobuf.Empty)
+      returns (OKagv_WaitTrajectoryResponse);
+
+  //okagv
+  rpc OKagv_GetOrder(google.protobuf.Empty)
+      returns (OKagv_GetOrderResponse);
+ 
+  //okagv
+  rpc OKagv_LocalizeTrajectory(OKagv_LocalizeTrajectoryRequest)
+      returns (OKagv_LocalizeTrajectoryResponse);
+
+  //okagv
+  rpc OKagv_LoadTrajectory(OKagv_LoadTrajectoryRequest) 
+      returns (OKagv_LoadTrajectoryResponse);
+
+  //okagv
+  rpc OKagv_SaveTrajectory(OKagv_SaveTrajectoryRequest)
+      returns (WriteStateToFileResponse);
+
+  //okagv
+  rpc OKagv_GetTrajectoryState(google.protobuf.Empty)
+      returns (OKagv_GetTrajectoryStateResponse);
+
 }

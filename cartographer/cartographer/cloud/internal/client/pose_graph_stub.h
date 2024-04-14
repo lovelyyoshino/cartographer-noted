@@ -34,7 +34,6 @@ class PoseGraphStub : public ::cartographer::mapping::PoseGraphInterface {
   void RunFinalOptimization() override;
   mapping::MapById<mapping::SubmapId, SubmapData> GetAllSubmapData()
       const override;
-  SubmapData GetSubmapData(const mapping::SubmapId& submap_id) const override;
   mapping::MapById<mapping::SubmapId, SubmapPose> GetAllSubmapPoses()
       const override;
   transform::Rigid3d GetLocalToGlobalTransform(
@@ -45,6 +44,17 @@ class PoseGraphStub : public ::cartographer::mapping::PoseGraphInterface {
   GetTrajectoryNodePoses() const override;
   std::map<int, TrajectoryState> GetTrajectoryStates() const override;
   std::map<std::string, transform::Rigid3d> GetLandmarkPoses() const override;
+  //okagv
+  std::map<std::string, transform::Rigid3d> GetLandmarkPosesWithId(int trajectory_id) const override;
+  //okagv
+    mapping::MapById<mapping::SubmapId, SubmapData> GetAllSubmapDataAfterUpdate()
+      const override;
+  //okagv
+    mapping::MapById<mapping::NodeId, mapping::TrajectoryNode>
+  GetTrajectoryNodesAfterUpdate() const override;
+  //okagv
+  std::map<std::string, transform::Rigid3d> GetLandmarkPosesAfterUpdate() const override;
+
   void SetLandmarkPose(const std::string& landmark_id,
                        const transform::Rigid3d& global_pose,
                        const bool frozen = false) override;
@@ -54,14 +64,77 @@ class PoseGraphStub : public ::cartographer::mapping::PoseGraphInterface {
   std::map<int, mapping::PoseGraphInterface::TrajectoryData> GetTrajectoryData()
       const override;
   std::vector<Constraint> constraints() const override;
+  //okagv
+  std::vector<Constraint> constraintsWithId(int trajectory_id) const override;
+  //okagv
+    std::map<int, mapping::PoseGraphInterface::TrajectoryData> GetTrajectoryDataAfterUpdate()
+      const override;
+  //okagv
+  std::vector<Constraint> constraintsAfterUpdate() const override;
+
   mapping::proto::PoseGraph ToProto(
       bool include_unfinished_submaps) const override;
   void SetGlobalSlamOptimizationCallback(
       GlobalSlamOptimizationCallback callback) override;
 
+  //okagv
+  OKagvOrder GetOKagv_Order() const override;
+  void SetOKagv_Order(const OKagvOrder& order) override;
+  bool LocalizeOKagvPoses(const bool use_initial_pose,
+                          const int trajectory_id,
+                          const transform::Rigid3d initial_pose) override;  
+
+  OKagvFeedback GetOKagv_Feedback() const override;
+  void SetOKagv_Feedback(const OKagvFeedback& feedback) override;                                         
+
+   //okagv
+  bool IsTrajectoryExist(int trajectory_id) const override;
+
+  //okagv
+  void GetCovarianceScore(double& score, bool& is_update) override;
+
+  //okagv
+  void SetTrajectoryState(int trajectoy_id, TrajectoryState state);
+
+      //okagv
+  void SetWorkingTrajectoryType(uint8_t type) override;
+
+  //okagv
+  uint8_t GetWorkingTrajectoryType() override;
+
+  //okagv
+  void SetCovarianceScore(double score) override;
+
+  //okagv
+  void SetConstraintBuilderMinScore(double score) override;
+
+  // okagv
+  mapping::proto::PoseGraph ToProtoWithId(
+      int trajectory_id, bool include_unfinished_submaps) const override;
+
+  // okagv
+  mapping::proto::PoseGraph ToProtoWithUpdate(
+      bool include_unfinished_submaps) const override;
+
+  // okagv
+  void StopDrainWorkQueue() override;
+  // okagv
+  void StartDrainWorkQueue() override;
+  // okagv
+  void SetThreadPoolState(
+      mapping::PoseGraphInterface::ThreadPoolState type) override;
+  // okagv
+  mapping::PoseGraphInterface::ThreadPoolState GetThreadPoolState() override;
+  
+  //okagv
+  void SetPoseGraphOption(mapping::proto::PoseGraphOptions& option_reset) override;
+
  private:
   std::shared_ptr<::grpc::Channel> client_channel_;
   const std::string client_id_;
+
+  mapping::PoseGraphInterface::OKagvOrder current_okagv_order_ =
+          mapping::PoseGraphInterface::OKagvOrder::WAIT;
 };
 
 }  // namespace cloud

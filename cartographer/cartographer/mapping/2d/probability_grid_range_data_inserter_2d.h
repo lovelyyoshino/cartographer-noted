@@ -31,16 +31,15 @@
 
 namespace cartographer {
 namespace mapping {
-// 概率栅格的激光数据接口参数设置
-proto::ProbabilityGridRangeDataInserterOptions2D
-       CreateProbabilityGridRangeDataInserterOptions2D(
-                         common::LuaParameterDictionary* parameter_dictionary);
 
-class ProbabilityGridRangeDataInserter2D : public RangeDataInserterInterface 
-{
+proto::ProbabilityGridRangeDataInserterOptions2D
+CreateProbabilityGridRangeDataInserterOptions2D(
+    common::LuaParameterDictionary* parameter_dictionary);
+
+class ProbabilityGridRangeDataInserter2D : public RangeDataInserterInterface {
  public:
   explicit ProbabilityGridRangeDataInserter2D(
-              const proto::ProbabilityGridRangeDataInserterOptions2D& options);
+      const proto::ProbabilityGridRangeDataInserterOptions2D& options);
 
   ProbabilityGridRangeDataInserter2D(
       const ProbabilityGridRangeDataInserter2D&) = delete;
@@ -49,6 +48,10 @@ class ProbabilityGridRangeDataInserter2D : public RangeDataInserterInterface
 
   // Inserts 'range_data' into 'probability_grid'.
   virtual void Insert(const sensor::RangeData& range_data,
+                      GridInterface* grid) const override;
+
+  //okagv
+  virtual void InsertForIntensity(const sensor::RangeData& range_data,
                       GridInterface* grid) const override;
 
  private:

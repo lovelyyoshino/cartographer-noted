@@ -50,6 +50,9 @@ class Collator : public CollatorInterface {
 
   absl::optional<int> GetBlockingTrajectoryId() const override;
 
+  //okagv
+  void DeleteTrajectory(int trajectory_id) override;
+
  private:
   // Queue keys are a pair of trajectory ID and sensor identifier.
   OrderedMultiQueue queue_;

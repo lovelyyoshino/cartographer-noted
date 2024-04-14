@@ -26,7 +26,7 @@
 
 namespace cartographer {
 namespace mapping {
-// 从Proto流中读取配置文件，设置配置项，主要包括最大时间间隔、最大角度间隔、最大距离间隔等
+
 proto::MotionFilterOptions CreateMotionFilterOptions(
     common::LuaParameterDictionary* parameter_dictionary);
 
@@ -38,15 +38,14 @@ class MotionFilter {
   // If the accumulated motion (linear, rotational, or time) is above the
   // threshold, returns false. Otherwise the relative motion is accumulated and
   // true is returned.
-  //根据设阈值,角度 位移 时间 变化值在符合范围就返回true
   bool IsSimilar(common::Time time, const transform::Rigid3d& pose);
 
  private:
   const proto::MotionFilterOptions options_;
-  int num_total_ = 0;  //总位姿数目
-  int num_different_ = 0;//过滤后剩下的数目
-  common::Time last_time_; //上一次时间
-  transform::Rigid3d last_pose_;//上一次位姿
+  int num_total_ = 0;
+  int num_different_ = 0;
+  common::Time last_time_;
+  transform::Rigid3d last_pose_;
 };
 
 }  // namespace mapping

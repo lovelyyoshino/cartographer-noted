@@ -79,7 +79,11 @@ message LandmarkData {
     transform.proto.Rigid3d landmark_to_tracking_transform = 2;
     double translation_weight = 3;
     double rotation_weight = 4;
+    bytes type = 5;
+    transform.proto.Rigid3d landmark_to_map_transform = 6;
   }
   int64 timestamp = 1;
   repeated LandmarkObservation landmark_observations = 2;
+  transform.proto.Rigid3d global_landmark_pose = 3;
+
 }

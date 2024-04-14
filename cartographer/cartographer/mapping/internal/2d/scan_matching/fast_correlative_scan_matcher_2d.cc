@@ -224,6 +224,19 @@ bool FastCorrelativeScanMatcher2D::MatchFullSubmap(
                                    min_score, score, pose_estimate);
 }
 
+bool FastCorrelativeScanMatcher2D::MatchForRelocalization(
+    const transform::Rigid2d& initial_pose_estimate,
+    const sensor::PointCloud& point_cloud, float min_score, float* score,
+    transform::Rigid2d* pose_estimate) const {
+  const SearchParameters search_parameters(options_.linear_search_window(),
+                                           M_PI,
+                                           point_cloud, limits_.resolution());
+
+  return MatchWithSearchParameters(search_parameters, initial_pose_estimate,
+                                   point_cloud, min_score, score,
+                                   pose_estimate);
+}
+
 bool FastCorrelativeScanMatcher2D::MatchWithSearchParameters(
     SearchParameters search_parameters,
     const transform::Rigid2d& initial_pose_estimate,
@@ -233,6 +246,7 @@ bool FastCorrelativeScanMatcher2D::MatchWithSearchParameters(
   CHECK(pose_estimate != nullptr);
 
   const Eigen::Rotation2Dd initial_rotation = initial_pose_estimate.rotation();
+  //LOG(INFO) << "initial_rotation angle: " << initial_rotation.cast<float>().angle();
   const sensor::PointCloud rotated_point_cloud = sensor::TransformPointCloud(
       point_cloud,
       transform::Rigid3f::Rotation(Eigen::AngleAxisf(
@@ -250,8 +264,8 @@ bool FastCorrelativeScanMatcher2D::MatchWithSearchParameters(
   const Candidate2D best_candidate = BranchAndBound(
       discrete_scans, search_parameters, lowest_resolution_candidates,
       precomputation_grid_stack_->max_depth(), min_score);
-  if (best_candidate.score > min_score) {
-    *score = best_candidate.score;
+  if (best_candidate.score > min_score) { //okagv add 1.75
+    *score = best_candidate.score; //okagv add 1.75
     *pose_estimate = transform::Rigid2d(
         {initial_pose_estimate.translation().x() + best_candidate.x,
          initial_pose_estimate.translation().y() + best_candidate.y},

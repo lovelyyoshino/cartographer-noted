@@ -26,10 +26,6 @@ wstool init
 
 # Merge the cartographer_ros.rosinstall file and fetch code for dependencies.
 wstool merge ../../cartographer_ros/cartographer_ros.rosinstall
-# We default to master and wstool seems to have a bug when it's being set twice.
-# TODO(MichaelGrupp): wstool is unmaintained, use vcstool.
-if [ ${CARTOGRAPHER_VERSION} != "master" ]; then
-  wstool set cartographer -v ${CARTOGRAPHER_VERSION} -y
-fi
+wstool set cartographer -v ${CARTOGRAPHER_VERSION} -y
 wstool remove cartographer_ros
 wstool update

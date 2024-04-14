@@ -23,9 +23,9 @@
 #include <set>
 #include <string>
 
-#include "cartographer/common/internal/rate_timer.h"
 #include "cartographer/common/port.h"
-#include "cartographer/mapping/internal/local_slam_result_data.h"
+#include "cartographer/common/rate_timer.h"
+#include "cartographer/mapping/local_slam_result_data.h"
 #include "cartographer/mapping/submaps.h"
 #include "cartographer/mapping/trajectory_builder_interface.h"
 #include "cartographer/sensor/collator_interface.h"
@@ -42,8 +42,7 @@ class CollatedTrajectoryBuilder : public TrajectoryBuilderInterface {
 
   CollatedTrajectoryBuilder(
       const proto::TrajectoryBuilderOptions& trajectory_options,
-      sensor::CollatorInterface* sensor_collator,
-      int trajectory_id,
+      sensor::CollatorInterface* sensor_collator, int trajectory_id,
       const std::set<SensorId>& expected_sensor_ids,
       std::unique_ptr<TrajectoryBuilderInterface> wrapped_trajectory_builder);
   ~CollatedTrajectoryBuilder() override {}

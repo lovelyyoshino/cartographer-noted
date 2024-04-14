@@ -89,5 +89,12 @@ metrics::Counter* TrajectoryCollator::GetOrCreateSensorMetric(
   return new_counter;
 }
 
+  void TrajectoryCollator::DeleteTrajectory(int trajectory_id)
+  {
+      trajectory_to_queue_.erase(trajectory_id);
+      trajectory_to_queue_keys_.erase(trajectory_id);
+      return;
+  }
+
 }  // namespace sensor
 }  // namespace cartographer

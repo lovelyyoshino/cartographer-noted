@@ -36,18 +36,15 @@
 #include "sensor_msgs/MultiEchoLaserScan.h"
 #include "sensor_msgs/NavSatFix.h"
 #include "sensor_msgs/PointCloud2.h"
-// 这个函数负责开启订阅各个传感器的消息，从而在消息回调函数中开启主要处理工作！注意：
-// 所有传感器的回调函数中会通过map_builder_bridge_.sensor_bridges_调用相关库函数。
+
 namespace cartographer_ros {
 
 // Converts ROS messages into SensorData in tracking frame for the MapBuilder.
 class SensorBridge {
  public:
   explicit SensorBridge(
-      int num_subdivisions_per_laser_scan,
-      const std::string& tracking_frame,
-      double lookup_transform_timeout_sec, 
-      tf2_ros::Buffer* tf_buffer,
+      int num_subdivisions_per_laser_scan, const std::string& tracking_frame,
+      double lookup_transform_timeout_sec, tf2_ros::Buffer* tf_buffer,
       ::cartographer::mapping::TrajectoryBuilderInterface* trajectory_builder);
 
   SensorBridge(const SensorBridge&) = delete;
@@ -60,6 +57,21 @@ class SensorBridge {
   void HandleNavSatFixMessage(const std::string& sensor_id,
                               const sensor_msgs::NavSatFix::ConstPtr& msg);
   void HandleLandmarkMessage(
+      const std::string& sensor_id,
+      const cartographer_ros_msgs::LandmarkList::ConstPtr& msg);
+
+  //okagv
+  void HandleReflectorLandmarkMessage(
+      const std::string& sensor_id,
+      ::cartographer::transform::Rigid3d current_tracking_to_map,
+      cartographer_ros_msgs::LandmarkList::ConstPtr msg);
+
+  // okagv
+  void HandleReflectorCombinedLandmarkMessage(
+      const std::string& sensor_id,
+      const cartographer_ros_msgs::LandmarkList::ConstPtr& msg);
+
+  void HandleQRCodeLandmarkMessage(
       const std::string& sensor_id,
       const cartographer_ros_msgs::LandmarkList::ConstPtr& msg);
 
@@ -87,6 +99,18 @@ class SensorBridge {
                          const std::string& frame_id,
                          const ::cartographer::sensor::TimedPointCloud& ranges);
 
+  void HandleRangefinderWithIntensities(const std::string& sensor_id,
+                         ::cartographer::common::Time time,
+                         const std::string& frame_id,
+                         const ::cartographer::sensor::TimedPointCloud& ranges,
+                         const std::vector<float>& intensities);
+
+  //okagv 
+  void HandleLaserScanWithIntensities(
+      const std::string& sensor_id, ::cartographer::common::Time start_time,
+      const std::string& frame_id,
+      const ::cartographer::sensor::PointCloudWithIntensities& points);
+
   const int num_subdivisions_per_laser_scan_;
   std::map<std::string, cartographer::common::Time>
       sensor_to_previous_subdivision_time_;
@@ -94,7 +118,7 @@ class SensorBridge {
   ::cartographer::mapping::TrajectoryBuilderInterface* const
       trajectory_builder_;
 
-  absl::optional<::cartographer::transform::Rigid3d> ecef_to_local_frame_;    //地心地固坐标系到局部框架
+  absl::optional<::cartographer::transform::Rigid3d> ecef_to_local_frame_;
 };
 
 }  // namespace cartographer_ros

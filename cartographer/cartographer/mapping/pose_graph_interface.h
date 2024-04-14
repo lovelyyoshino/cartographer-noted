@@ -25,6 +25,8 @@
 #include "cartographer/mapping/submaps.h"
 #include "cartographer/transform/rigid_transform.h"
 
+#include "cartographer/mapping/proto/pose_graph_options.pb.h"
+
 namespace cartographer {
 namespace mapping {
 
@@ -49,8 +51,6 @@ class PoseGraphInterface {
     // Differentiates between intra-submap (where node 'j' was inserted into
     // submap 'i') and inter-submap constraints (where node 'j' was not inserted
     // into submap 'i').
-    // 区分子映射内（节点“j”插入子映射“i”）和子映射间约束（节点“j”未插入子映射“i”）。
-    //  约束分为　节点到自身子图的　子图内约束（普通约束），和　节点到其他子图的　子图间约束（闭环约束
     enum Tag { INTRA_SUBMAP, INTER_SUBMAP } tag;
   };
 
@@ -65,6 +65,8 @@ class PoseGraphInterface {
     std::vector<LandmarkObservation> landmark_observations;
     absl::optional<transform::Rigid3d> global_landmark_pose;
     bool frozen = false;
+    //okagv
+    double confidence_score;
   };
 
   struct SubmapPose {
@@ -83,10 +85,33 @@ class PoseGraphInterface {
     absl::optional<transform::Rigid3d> fixed_frame_origin_in_map;
   };
 
-  enum class TrajectoryState { ACTIVE,                      //   0               //枚举类，
-                               FINISHED,                    //   1 
-                               FROZEN,                      //   2
-                               DELETED };                   //   3 
+  enum class TrajectoryState { ACTIVE, FINISHED, FROZEN, DELETED, IDLE};
+
+  enum class ThreadPoolState { ACTIVE, IDLE};
+
+  enum class OKagvOrder { START, FINISH, WAIT, SAVE, LOCALIZE};
+
+  enum class OKagvState {PROCESSING, SUCCESS, FAIL};
+
+  /*---------------------------------------------------------------
+                           OKagvFeedback
+     0 - no error
+     1 -  
+     2 -  
+     3 -
+     4 -
+     5 -
+     6 -
+     7 -
+     8 -
+     9 -
+  ----------------------------------------------------------------*/
+
+    struct OKagvFeedback{
+      int code;
+      std::string message;
+      OKagvState state;
+  };
 
   using GlobalSlamOptimizationCallback =
       std::function<void(const std::map<int /* trajectory_id */, SubmapId>&,
@@ -104,10 +129,8 @@ class PoseGraphInterface {
   // Returns data for all submaps.
   virtual MapById<SubmapId, SubmapData> GetAllSubmapData() const = 0;
 
-  // Returns the current optimized transform and submap itself for the given
-  // 'submap_id'. Returns 'nullptr' for the 'submap' member if the submap does
-  // not exist (anymore).
-  virtual SubmapData GetSubmapData(const SubmapId& submap_id) const = 0;
+  // okagv
+  virtual MapById<SubmapId, SubmapData> GetAllSubmapDataAfterUpdate() const = 0;
 
   // Returns the global poses for all submaps.
   virtual MapById<SubmapId, SubmapPose> GetAllSubmapPoses() const = 0;
@@ -121,6 +144,9 @@ class PoseGraphInterface {
   // Returns the current optimized trajectories.
   virtual MapById<NodeId, TrajectoryNode> GetTrajectoryNodes() const = 0;
 
+  // okagv
+  virtual MapById<NodeId, TrajectoryNode> GetTrajectoryNodesAfterUpdate() const = 0;
+
   // Returns the current optimized trajectory poses.
   virtual MapById<NodeId, TrajectoryNodePose> GetTrajectoryNodePoses()
       const = 0;
@@ -128,9 +154,23 @@ class PoseGraphInterface {
   // Returns the states of trajectories.
   virtual std::map<int, TrajectoryState> GetTrajectoryStates() const = 0;
 
+  // okagv
+  virtual OKagvOrder GetOKagv_Order() const = 0;
+  virtual void SetOKagv_Order(const OKagvOrder& order) = 0;
+  virtual bool LocalizeOKagvPoses(const bool use_initial_pose,
+                                  const int trajectory_id,
+                                  const transform::Rigid3d initial_pose) = 0;
+
+  virtual OKagvFeedback GetOKagv_Feedback() const = 0;
+  virtual void SetOKagv_Feedback(const OKagvFeedback& order) = 0;
+
   // Returns the current optimized landmark poses.
   virtual std::map<std::string, transform::Rigid3d> GetLandmarkPoses()
       const = 0;
+  //okagv
+  virtual std::map<std::string, transform::Rigid3d> GetLandmarkPosesWithId(int trajectory_id) const = 0;
+  //okagv
+  virtual std::map<std::string, transform::Rigid3d> GetLandmarkPosesAfterUpdate() const = 0;
 
   // Sets global pose of landmark 'landmark_id' to given 'global_pose'.
   virtual void SetLandmarkPose(const std::string& landmark_id,
@@ -148,9 +188,18 @@ class PoseGraphInterface {
 
   // Returns the trajectory data.
   virtual std::map<int, TrajectoryData> GetTrajectoryData() const = 0;
+    
+  // okagv
+  virtual std::map<int, TrajectoryData> GetTrajectoryDataAfterUpdate() const = 0;
 
   // Returns the collection of constraints.
   virtual std::vector<Constraint> constraints() const = 0;
+
+  // okagv
+  virtual std::vector<Constraint> constraintsWithId(int trajectory_id) const = 0;
+
+  // okagv
+  virtual std::vector<Constraint> constraintsAfterUpdate() const = 0;
 
   // Serializes the constraints and trajectories. If
   // 'include_unfinished_submaps' is set to 'true', unfinished submaps, i.e.
@@ -158,10 +207,47 @@ class PoseGraphInterface {
   // be included, otherwise not.
   virtual proto::PoseGraph ToProto(bool include_unfinished_submaps) const = 0;
 
+  //okagv
+  virtual proto::PoseGraph ToProtoWithId(int trajectory_id, bool include_unfinished_submaps) const = 0;
+
+  //okagv
+  virtual proto::PoseGraph ToProtoWithUpdate(bool include_unfinished_submaps) const = 0;
+
   // Sets the callback function that is invoked whenever the global optimization
   // problem is solved.
   virtual void SetGlobalSlamOptimizationCallback(
       GlobalSlamOptimizationCallback callback) = 0;
+
+  //okagv
+  virtual bool IsTrajectoryExist(int trajectory_id) const = 0;
+
+  //okagv
+  virtual void GetCovarianceScore(double& score, bool& is_update) = 0;
+  //okagv
+  virtual void SetTrajectoryState(int trajectory_id, TrajectoryState state) = 0;
+  //okagv
+  virtual void SetWorkingTrajectoryType(uint8_t type) = 0;
+  //okagv
+  virtual uint8_t GetWorkingTrajectoryType() = 0;
+  //okagv
+  virtual void SetCovarianceScore(double score) = 0;
+  //okagv
+  virtual void SetConstraintBuilderMinScore(double score) = 0;
+
+  
+  //okagv
+  virtual void StopDrainWorkQueue() = 0;
+  //okagv 
+  virtual void StartDrainWorkQueue() = 0;
+  //okagv
+  virtual void SetThreadPoolState(ThreadPoolState type) = 0;
+  //okagv
+  virtual ThreadPoolState GetThreadPoolState() = 0;
+
+  //okagv
+  virtual void SetPoseGraphOption(proto::PoseGraphOptions& option_reset) = 0;
+  
+
 };
 
 }  // namespace mapping

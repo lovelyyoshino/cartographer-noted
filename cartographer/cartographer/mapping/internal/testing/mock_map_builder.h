@@ -26,6 +26,9 @@
 
 using testing::_;
 
+using TrajectoryType 
+      = cartographer::mapping::MapBuilderInterface::TrajectoryType;
+
 namespace cartographer {
 namespace mapping {
 namespace testing {
@@ -50,15 +53,39 @@ class MockMapBuilder : public mapping::MapBuilderInterface {
   MOCK_METHOD2(SerializeState, void(bool, io::ProtoStreamWriterInterface *));
   MOCK_METHOD2(SerializeStateToFile, bool(bool, const std::string &));
   MOCK_METHOD2(LoadState,
-               std::map<int, int>(io::ProtoStreamReaderInterface *, bool));
+               std::map<int, int>(io::ProtoStreamReaderInterface *, const cartographer::mapping::PoseGraphInterface::TrajectoryState& ));
   MOCK_METHOD2(LoadStateFromFile,
-               std::map<int, int>(const std::string &, bool));
+               std::map<int, int>(const std::string &, const cartographer::mapping::PoseGraphInterface::TrajectoryState&));
   MOCK_CONST_METHOD0(num_trajectory_builders, int());
   MOCK_METHOD0(pose_graph, mapping::PoseGraphInterface *());
   MOCK_CONST_METHOD0(
       GetAllTrajectoryBuilderOptions,
-      const std::vector<mapping::proto::TrajectoryBuilderOptionsWithSensorIds>
+      const std::map<int, mapping::proto::TrajectoryBuilderOptionsWithSensorIds>
           &());
+
+   //okagv
+   MOCK_METHOD2(SetTrajectoryTypeWithId, void(TrajectoryType, int));
+   //okagv
+   MOCK_METHOD1(DeleteTrajectory, void(int trajectory_id));
+
+   //okagv
+   MOCK_METHOD1(GetTrajectoryTypeWithId, TrajectoryType(int));
+
+   //okagv
+   MOCK_METHOD3(SerializeStateToFileWithId, bool(int, bool, const std::string &));
+
+   MOCK_METHOD0(GetTrajectoryTypeWithId,TrajectoryType());
+   //okagv
+   MOCK_METHOD1(GetTrajectoryIdByName, int(std::string));
+
+   //okagv
+   MOCK_METHOD2(RegisterClientIdForTrajectory,void(const std::string &, int));
+
+   //okagv
+   MOCK_METHOD2(SerializeStateToFileAfterUpdate, bool(bool, const std::string &));
+
+   //okagv
+   MOCK_METHOD1(SetMapBuilderOptions, void(mapping::proto::MapBuilderOptions &));
 };
 
 }  // namespace testing

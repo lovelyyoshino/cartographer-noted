@@ -24,6 +24,7 @@ message CeresScanMatcherOptions2D {
   double occupied_space_weight = 1;
   double translation_weight = 2;
   double rotation_weight = 3;
+  double intensity_space_weight = 4;
 
   // Configure the Ceres solver. See the Ceres documentation for more
   // information: https://code.google.com/p/ceres-solver/

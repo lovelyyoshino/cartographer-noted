@@ -116,6 +116,10 @@ class OptimizationProblem3D
     return trajectory_data_;
   }
 
+  const sensor::MapByTime<sensor::ImuData>& imu_data_after_update() override {
+    return imu_data_;
+  }
+
  private:
   // Computes the relative pose between two nodes based on odometry data.
   std::unique_ptr<transform::Rigid3d> CalculateOdometryBetweenNodes(

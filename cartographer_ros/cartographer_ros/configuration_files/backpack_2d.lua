@@ -46,4 +46,13 @@ options = {
 MAP_BUILDER.use_trajectory_builder_2d = true
 TRAJECTORY_BUILDER_2D.num_accumulated_range_data = 10
 
+POSE_GRAPH.constraint_builder.log_matches = false
+POSE_GRAPH.log_residual_histograms = false
+POSE_GRAPH.optimization_problem.log_solver_summary =false
+
+
+
+
+
+
 return options

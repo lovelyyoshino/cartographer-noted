@@ -28,7 +28,7 @@ class TrajectoryBuilderInterface;
 }
 
 namespace sensor {
-//------------------------------传感器id 获取时间 添加轨迹生成器 
+
 class Data {
  public:
   explicit Data(const std::string &sensor_id) : sensor_id_(sensor_id) {}

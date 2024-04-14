@@ -39,6 +39,9 @@ add_message_files(
     SubmapList.msg
     SubmapTexture.msg
     TrajectoryStates.msg
+    RobotPose.msg
+    LaserScanStates.msg
+    Rosbag.msg
 )
 
 add_service_files(
@@ -51,6 +54,11 @@ add_service_files(
     SubmapQuery.srv
     TrajectoryQuery.srv
     WriteState.srv
+    LoadTrajectory.srv
+    DeleteTrajectory.srv
+    LocalizeTrajectory.srv 
+    SetTrajectoryStates.srv
+    ScanQualityQuery.srv
 )
 
 generate_messages(

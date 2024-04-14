@@ -25,6 +25,8 @@
 #include "prometheus/exposer.h"
 #endif
 
+#include "cartographer/mapping/proto/map_builder_options.pb.h"
+
 DEFINE_string(configuration_directory, "",
               "First directory in which configuration files are searched, "
               "second is always the Cartographer installation to allow "
@@ -32,6 +34,7 @@ DEFINE_string(configuration_directory, "",
 DEFINE_string(configuration_basename, "",
               "Basename, i.e. not containing any directory prefix, of the "
               "configuration file.");
+
 
 namespace cartographer {
 namespace cloud {
@@ -50,10 +53,11 @@ void Run(const std::string& configuration_directory,
   proto::MapBuilderServerOptions map_builder_server_options =
       LoadMapBuilderServerOptions(configuration_directory,
                                   configuration_basename);
-  auto map_builder = mapping::CreateMapBuilder(
-      map_builder_server_options.map_builder_options());
-  std::unique_ptr<MapBuilderServerInterface> map_builder_server =
-      CreateMapBuilderServer(map_builder_server_options,
+
+  auto map_builder = std::make_shared<mapping::MapBuilder>( //okagv default is absl::unique_ptr
+      const_cast<cartographer::mapping::proto::MapBuilderOptions&>(map_builder_server_options.map_builder_options())); //okagv const to non-const
+  std::unique_ptr<MapBuilderServerInterface> map_builder_server = 
+      CreateMapBuilderServer(map_builder_server_options,//okagv default is  unique_ptr
                              std::move(map_builder));
   map_builder_server->Start();
   map_builder_server->WaitForShutdown();

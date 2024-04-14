@@ -48,48 +48,35 @@ class LocalSlamResultData;
 class TrajectoryBuilderInterface {
  public:
   struct InsertionResult {
-    NodeId node_id;　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　
-    //包含两个部分：
-    //一个int型的trajectory_id和一个int型的node_index
-    //重载了一些trajectory_id和node_index与其他比较运算符 == != <
-    //并且对trajectory_id和node_index进行序列化
-
-    std::shared_ptr<const TrajectoryNode::Data> constant_data;               
-    //结构体 : 时间 　旋转矩阵　经过投影滤波点云　　局部slam位姿
-
-    std::vector<std::shared_ptr<const Submap>> insertion_submaps;            
-    //主要处理子图的位姿 子图状态(是否完成)  
-    //子图的proto类型数据 以及转换proto
-    // 建立好的子图列表
+    NodeId node_id;
+    std::shared_ptr<const TrajectoryNode::Data> constant_data;
+    std::vector<std::shared_ptr<const Submap>> insertion_submaps;
   };
 
   // A callback which is called after local SLAM processes an accumulated
   // 'sensor::RangeData'. If the data was inserted into a submap, reports the
   // assigned 'NodeId', otherwise 'nullptr' if the data was filtered out.
   using LocalSlamResultCallback =
-      std::function<void(int /* trajectory ID */, 
-                         common::Time,
-                         transform::Rigid3d /* local pose estimate */,     
+      std::function<void(int /* trajectory ID */, common::Time,
+                         transform::Rigid3d /* local pose estimate */,
                          sensor::RangeData /* in local frame */,
                          std::unique_ptr<const InsertionResult>)>;
 
-  struct SensorId {                                                        
-      //定义传感器id  枚举类型 
-    enum class SensorType { RANGE = 0, 
-                            IMU,
-                            ODOMETRY,
-                            FIXED_FRAME_POSE,
-                            LANDMARK,
-                            LOCAL_SLAM_RESULT
+  struct SensorId {
+    enum class SensorType {
+      RANGE = 0,
+      IMU,
+      ODOMETRY,
+      FIXED_FRAME_POSE,
+      LANDMARK,
+      LOCAL_SLAM_RESULT
     };
 
-    SensorType type;                                                      
-    //创建传感器id  枚举类型 对象
-    std::string id;                                                       
-    //字符串
+    SensorType type;
+    std::string id;
 
     bool operator==(const SensorId& other) const {
-      return std::forward_as_tuple(type, id) ==  
+      return std::forward_as_tuple(type, id) ==
              std::forward_as_tuple(other.type, other.id);
     }
 
@@ -100,38 +87,33 @@ class TrajectoryBuilderInterface {
   };
 
   TrajectoryBuilderInterface() {}
-  // 虚函数 
   virtual ~TrajectoryBuilderInterface() {}
 
   TrajectoryBuilderInterface(const TrajectoryBuilderInterface&) = delete;
   TrajectoryBuilderInterface& operator=(const TrajectoryBuilderInterface&) =
       delete;
-      //下面主要是添加不同传感器信息的函数
-      //虚函数,需要实例化
+
   virtual void AddSensorData(
       const std::string& sensor_id,
       const sensor::TimedPointCloudData& timed_point_cloud_data) = 0;
-  virtual void AddSensorData(const std::string& sensor_id,                      
-                            //imu
+  virtual void AddSensorData(const std::string& sensor_id,
                              const sensor::ImuData& imu_data) = 0;
-  virtual void AddSensorData(const std::string& sensor_id,                      
-  //odom
+  virtual void AddSensorData(const std::string& sensor_id,
                              const sensor::OdometryData& odometry_data) = 0;
-  virtual void AddSensorData(                                                   //GPS
+  virtual void AddSensorData(
       const std::string& sensor_id,
       const sensor::FixedFramePoseData& fixed_frame_pose) = 0;
-  virtual void AddSensorData(const std::string& sensor_id,                       //路标
+  virtual void AddSensorData(const std::string& sensor_id,
                              const sensor::LandmarkData& landmark_data) = 0;
   // Allows to directly add local SLAM results to the 'PoseGraph'. Note that it
   // is invalid to add local SLAM results for a trajectory that has a
   // 'LocalTrajectoryBuilder2D/3D'.
-  virtual void AddLocalSlamResultData( 
-      std::unique_ptr<mapping::LocalSlamResultData> local_slam_result_data) = 0;   //Data :传感器id 获取时间 添加轨迹生成器
-                                                                                   //添加 轨迹id到全局位姿
+  virtual void AddLocalSlamResultData(
+      std::unique_ptr<mapping::LocalSlamResultData> local_slam_result_data) = 0;
 };
 
-proto::SensorId ToProto(const TrajectoryBuilderInterface::SensorId& sensor_id);    //传感器id 转proto 序列化
-TrajectoryBuilderInterface::SensorId FromProto(                                    //获取传感器id proto 信息
+proto::SensorId ToProto(const TrajectoryBuilderInterface::SensorId& sensor_id);
+TrajectoryBuilderInterface::SensorId FromProto(
     const proto::SensorId& sensor_id_proto);
 
 }  // namespace mapping

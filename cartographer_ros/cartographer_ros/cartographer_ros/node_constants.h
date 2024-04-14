@@ -34,7 +34,6 @@ constexpr char kFinishTrajectoryServiceName[] = "finish_trajectory";
 constexpr char kOccupancyGridTopic[] = "map";
 constexpr char kScanMatchedPointCloudTopic[] = "scan_matched_points2";
 constexpr char kSubmapListTopic[] = "submap_list";
-constexpr char kTrackedPoseTopic[] = "tracked_pose";
 constexpr char kSubmapQueryServiceName[] = "submap_query";
 constexpr char kTrajectoryQueryServiceName[] = "trajectory_query";
 constexpr char kStartTrajectoryServiceName[] = "start_trajectory";
@@ -47,9 +46,28 @@ constexpr char kConstraintListTopic[] = "constraint_list";
 constexpr double kConstraintPublishPeriodSec = 0.5;
 constexpr double kTopicMismatchCheckDelaySec = 3.0;
 
+//okagv
+constexpr char kRobotPoseTopic[] = "robot_pose";
+
 constexpr int kInfiniteSubscriberQueueSize = 0;
 constexpr int kLatestOnlyPublisherQueueSize = 1;
 
+//okagv
+constexpr char kLocalizeTrajectoryServiceName[] = "localize_trajectory";
+constexpr char kLoadTrajectoryServiceName[] = "load_trajectory";
+constexpr char kDeleteTrajectoryServiceName[] = "delete_trajectory";
+constexpr char kSetTrajectoryStatesServiceName[] = "set_trajectory_states";
+
+//okagv
+constexpr char kLaserScanQualityServiceName[] = "scan_quality";
+
+//okagv
+constexpr char kRosbagStartRecordTopic[] = "/record/start";
+constexpr char kRosbagStopRecordTopic[] = "/record/stop";
+
+//okagv
+constexpr char kUpdateStateServiceName[] = "update_state";
+ 
 // For multiple topics adds numbers to the topic name and returns the list.
 std::vector<std::string> ComputeRepeatedTopicNames(const std::string& topic,
                                                    int num_topics);

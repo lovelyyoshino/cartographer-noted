@@ -32,7 +32,7 @@ void LoadStateFromFileHandler::OnRequest(
   // background.
   auto trajectory_remapping =
       GetContext<MapBuilderContextInterface>()->map_builder().LoadStateFromFile(
-          request.file_path(), request.load_frozen_state());
+          request.file_path(), cartographer::mapping::PoseGraphInterface::TrajectoryState::FROZEN);
   for (const auto& entry : trajectory_remapping) {
     GetContext<MapBuilderContextInterface>()->RegisterClientIdForTrajectory(
         request.client_id(), entry.second);

@@ -107,24 +107,20 @@ std::vector<sensor::PointCloud> GenerateRotatedScans(
   }
   return rotated_scans;
 }
-//地图序列化离散点
+
 std::vector<DiscreteScan2D> DiscretizeScans(
-    const MapLimits& map_limits,                   //地图限制
-    const std::vector<sensor::PointCloud>& scans,  //点云
-    const Eigen::Translation2f& initial_translation)   //初始平移
-{
-  std::vector<DiscreteScan2D> discrete_scans;//定义离散点集容器
-  discrete_scans.reserve(scans.size());      //离散点云分配空间
-  for (const sensor::PointCloud& scan : scans) 
-  {
+    const MapLimits& map_limits, const std::vector<sensor::PointCloud>& scans,
+    const Eigen::Translation2f& initial_translation) {
+  std::vector<DiscreteScan2D> discrete_scans;
+  discrete_scans.reserve(scans.size());
+  for (const sensor::PointCloud& scan : scans) {
     discrete_scans.emplace_back();
     discrete_scans.back().reserve(scan.size());
-    for (const sensor::RangefinderPoint& point : scan) 
-    {
+    for (const sensor::RangefinderPoint& point : scan) {
       const Eigen::Vector2f translated_point =
-                             Eigen::Affine2f(initial_translation) * point.position.head<2>();//平移xy轴
+          Eigen::Affine2f(initial_translation) * point.position.head<2>();
       discrete_scans.back().push_back(
-                            map_limits.GetCellIndex(translated_point));//坐标转序列号并存储离散点云
+          map_limits.GetCellIndex(translated_point));
     }
   }
   return discrete_scans;

@@ -55,6 +55,11 @@ proto::ConstraintBuilderOptions CreateConstraintBuilderOptions(
   *options.mutable_ceres_scan_matcher_options_3d() =
       scan_matching::CreateCeresScanMatcherOptions3D(
           parameter_dictionary->GetDictionary("ceres_scan_matcher_3d").get());
+
+  //okagv
+  options.set_max_match_variety_distance(
+      parameter_dictionary->GetDouble("max_match_variety_distance"));
+
   return options;
 }
 

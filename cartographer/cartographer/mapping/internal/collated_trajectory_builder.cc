@@ -24,7 +24,7 @@ namespace mapping {
 
 namespace {
 
-constexpr double kSensorDataRatesLoggingPeriodSeconds = 15.;
+constexpr double kSensorDataRatesLoggingPeriodSeconds = 150.; //default 15. okagv
 
 }  // namespace
 

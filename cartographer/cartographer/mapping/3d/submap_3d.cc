@@ -37,14 +37,16 @@ struct PixelData {
 };
 
 // Filters 'range_data', retaining only the returns that have no more than
-// 'max_range' distance from the origin. Removes misses.
+// 'max_range' distance from the origin. Removes misses and reflectivity
+// information.
 sensor::RangeData FilterRangeDataByMaxRange(const sensor::RangeData& range_data,
                                             const float max_range) {
   sensor::RangeData result{range_data.origin, {}, {}};
-  result.returns =
-      range_data.returns.copy_if([&](const sensor::RangefinderPoint& point) {
-        return (point.position - range_data.origin).norm() <= max_range;
-      });
+  for (const sensor::RangefinderPoint& hit : range_data.returns) {
+    if ((hit.position - range_data.origin).norm() <= max_range) {
+      result.returns.push_back(hit);
+    }
+  }
   return result;
 }
 
@@ -78,11 +80,8 @@ std::vector<PixelData> AccumulatePixelData(
 // last is the corresponding probability value. We batch them together like
 // this to only have one vector and have better cache locality.
 std::vector<Eigen::Array4i> ExtractVoxelData(
-    const HybridGrid& hybrid_grid, 
-    const transform::Rigid3f& transform,
-    Eigen::Array2i* min_index, 
-    Eigen::Array2i* max_index) 
-{
+    const HybridGrid& hybrid_grid, const transform::Rigid3f& transform,
+    Eigen::Array2i* min_index, Eigen::Array2i* max_index) {
   std::vector<Eigen::Array4i> voxel_indices_and_probabilities;
   const float resolution_inverse = 1.f / hybrid_grid.resolution();
 
@@ -147,10 +146,8 @@ std::string ComputePixelValues(
 }
 
 void AddToTextureProto(
-    const HybridGrid& hybrid_grid, 
-    const transform::Rigid3d& global_submap_pose,
-    proto::SubmapQuery::Response::SubmapTexture* const texture) 
-{
+    const HybridGrid& hybrid_grid, const transform::Rigid3d& global_submap_pose,
+    proto::SubmapQuery::Response::SubmapTexture* const texture) {
   // Generate an X-ray view through the 'hybrid_grid', aligned to the
   // xy-plane in the global map frame.
   const float resolution = hybrid_grid.resolution();
@@ -207,8 +204,6 @@ Submap3D::Submap3D(const float high_resolution, const float low_resolution,
           absl::make_unique<HybridGrid>(high_resolution)),
       low_resolution_hybrid_grid_(
           absl::make_unique<HybridGrid>(low_resolution)),
-      high_resolution_intensity_hybrid_grid_(
-          absl::make_unique<IntensityHybridGrid>(high_resolution)),
       rotational_scan_matcher_histogram_(rotational_scan_matcher_histogram) {}
 
 Submap3D::Submap3D(const proto::Submap3D& proto)
@@ -261,11 +256,12 @@ void Submap3D::UpdateFromProto(const proto::Submap3D& submap_3d) {
         submap_3d.rotational_scan_matcher_histogram(i);
   }
 }
-//将位姿添加到文本序列  包括高分辨率 和 低分辨率
+
 void Submap3D::ToResponseProto(
     const transform::Rigid3d& global_submap_pose,
     proto::SubmapQuery::Response* const response) const {
   response->set_submap_version(num_range_data());
+
   AddToTextureProto(*high_resolution_hybrid_grid_, global_submap_pose,
                     response->add_textures());
   AddToTextureProto(*low_resolution_hybrid_grid_, global_submap_pose,
@@ -284,11 +280,9 @@ void Submap3D::InsertData(const sensor::RangeData& range_data_in_local,
   range_data_inserter.Insert(
       FilterRangeDataByMaxRange(transformed_range_data,
                                 high_resolution_max_range),
-      high_resolution_hybrid_grid_.get(),
-      high_resolution_intensity_hybrid_grid_.get());
+      high_resolution_hybrid_grid_.get());
   range_data_inserter.Insert(transformed_range_data,
-                             low_resolution_hybrid_grid_.get(),
-                             /*intensity_hybrid_grid=*/nullptr);
+                             low_resolution_hybrid_grid_.get());
   set_num_range_data(num_range_data() + 1);
   const float yaw_in_submap_from_gravity = transform::GetYaw(
       local_pose().inverse().rotation() * local_from_gravity_aligned);
@@ -338,13 +332,8 @@ void ActiveSubmaps3D::AddSubmap(
     const int rotational_scan_matcher_histogram_size) {
   if (submaps_.size() >= 2) {
     // This will crop the finished Submap before inserting a new Submap to
-    // reduce peak memory usage a bit.
+    // reduce okagv memory usage a bit.
     CHECK(submaps_.front()->insertion_finished());
-    // We use `ForgetIntensityHybridGrid` to reduce memory usage. Since we use
-    // active submaps and their associated intensity hybrid grids for scan
-    // matching, we call `ForgetIntensityHybridGrid` once we remove the submap
-    // from active submaps and no longer need the intensity hybrid grid.
-    submaps_.front()->ForgetIntensityHybridGrid();
     submaps_.erase(submaps_.begin());
   }
   const Eigen::VectorXf initial_rotational_scan_matcher_histogram =

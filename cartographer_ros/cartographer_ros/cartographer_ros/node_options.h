@@ -28,24 +28,38 @@
 namespace cartographer_ros {
 
 // Top-level options of Cartographer's ROS integration.
-struct NodeOptions {//定义节点结构   参数配置
-  ::cartographer::mapping::proto::MapBuilderOptions map_builder_options;//
+struct NodeOptions {
+  ::cartographer::mapping::proto::MapBuilderOptions map_builder_options;
   std::string map_frame;
-  double lookup_transform_timeout_sec;                      //查找超时时间
-  double submap_publish_period_sec;                         //子图发布周期
-  double pose_publish_period_sec;                           //位姿发布周期
-  double trajectory_publish_period_sec;                     //轨迹发布周期
-  bool publish_to_tf = true;;                               //发布到tf
-  bool publish_tracked_pose = false;                        //发布跟踪器估计位姿
-  bool use_pose_extrapolator = true;;                       //使用位姿插值器
+  double lookup_transform_timeout_sec;
+  double submap_publish_period_sec;
+  double pose_publish_period_sec;
+  double trajectory_publish_period_sec;
+  bool use_pose_extrapolator = true;
+  //okagv
+  std::string root_file_directory;
+  double imu_publish_period_sec;
+  bool use_pose_smoother = true;
+  double smoother_variety_distance;
+  double relocalization_variety_distance;
+  double time_delay_for_relocalization;
+  double time_delay_for_finish_trajectory;
+  double time_delay_for_delete_trajectory;
+  double time_delay_for_start_trajectory;
+
 };
 
 NodeOptions CreateNodeOptions(
     ::cartographer::common::LuaParameterDictionary* lua_parameter_dictionary);
 
-std::tuple<NodeOptions, TrajectoryOptions> LoadOptions(//加载lua文件，并且解析是属于node_options还是trajectory_options
+std::tuple<NodeOptions, TrajectoryOptions> LoadOptions(
     const std::string& configuration_directory,
     const std::string& configuration_basename);
+
+NodeOptions LoadNodeOptions(
+    const std::string& configuration_directory,
+    const std::string& configuration_basename);
+
 }  // namespace cartographer_ros
 
 #endif  // CARTOGRAPHER_ROS_CARTOGRAPHER_ROS_NODE_OPTIONS_H

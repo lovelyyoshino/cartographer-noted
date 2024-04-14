@@ -23,50 +23,31 @@
 
 namespace cartographer {
 namespace mapping {
-// --------------------------------ProbabilityGrid--------------------------------------------------
-//定义概率栅格
+
 ProbabilityGrid::ProbabilityGrid(const MapLimits& limits,
                                  ValueConversionTables* conversion_tables)
-       //初始化  Grid2D栅格                           
-    : Grid2D(limits,                                                         
-             kMinCorrespondenceCost,       
-             kMaxCorrespondenceCost,
+    : Grid2D(limits, kMinCorrespondenceCost, kMaxCorrespondenceCost,
              conversion_tables),
-      conversion_tables_(conversion_tables) 
-      {}
+      conversion_tables_(conversion_tables) {}
 
-//-------------------------------------ProbabilityGrid----------------------------------------------
-//定义proto流概率栅格
 ProbabilityGrid::ProbabilityGrid(const proto::Grid2D& proto,
                                  ValueConversionTables* conversion_tables)
-                                : Grid2D(proto, conversion_tables),           
-                                 // 定义proto流的概率栅格
-                                  conversion_tables_(conversion_tables) 
-{
-  CHECK(proto.has_probability_grid_2d());                                     
-   //检查有没有概率栅格数据
+    : Grid2D(proto, conversion_tables), conversion_tables_(conversion_tables) {
+  CHECK(proto.has_probability_grid_2d());
 }
 
 // Sets the probability of the cell at 'cell_index' to the given
 // 'probability'. Only allowed if the cell was unknown before.
-// -------------------------------------------------------------------------------
-//  可用来设置一个给定局部map栅格坐标的概率值
-void ProbabilityGrid::SetProbability(const Eigen::Array2i& cell_index,          
-                                          //map地图坐标值
-                                     const float probability) 
-{
+void ProbabilityGrid::SetProbability(const Eigen::Array2i& cell_index,
+                                     const float probability) {
   uint16& cell =
-      (*mutable_correspondence_cost_cells())[ToFlatIndex(cell_index)];          
-       //通过指针函数 和坐标 查找出空闲概率值
-  CHECK_EQ(cell, kUnknownProbabilityValue);                                     
-   //检查是否为空
-  cell = CorrespondenceCostToValue(ProbabilityToCorrespondenceCost(probability));
- // 先将占用概率转空闲概率 再用空闲概率 转[1,32767] 整数
- // 返回到cell内 并指向cell_index 坐标下的空闲概率
- // 边界规范 并且 转int  1-32766.f
-  mutable_known_cells_box()->extend(cell_index.matrix());                         
-  // 边界延申????
+      (*mutable_correspondence_cost_cells())[ToFlatIndex(cell_index)];
+  CHECK_EQ(cell, kUnknownProbabilityValue);
+  cell =
+      CorrespondenceCostToValue(ProbabilityToCorrespondenceCost(probability));
+  mutable_known_cells_box()->extend(cell_index.matrix());
 }
+
 
 // Applies the 'odds' specified when calling ComputeLookupTableToApplyOdds()
 // to the probability of the cell at 'cell_index' if the cell has not already
@@ -75,50 +56,30 @@ void ProbabilityGrid::SetProbability(const Eigen::Array2i& cell_index,
 //
 // If this is the first call to ApplyOdds() for the specified cell, its value
 // will be set to probability corresponding to 'odds'.
-// ----------------------------------ApplyLookupTable---------------------------------------
-// 通过查表来更新栅格单元的占用概率的
 bool ProbabilityGrid::ApplyLookupTable(const Eigen::Array2i& cell_index,
-                                       const std::vector<uint16>& table) 
-{
-  DCHECK_EQ(table.size(), kUpdateMarker);                                       
-  //判断表大小是否等于15
-  const int flat_index = ToFlatIndex(cell_index);                               
-  //将地图坐标位姿返回坐标索引序号
-  uint16* cell = &(*mutable_correspondence_cost_cells())[flat_index];           
-  //通过序号读取空闲概率
-  if (*cell >= kUpdateMarker)                                                  
-   /// 空闲概率 大于一单元 就返回false
-  {
+                                       const std::vector<uint16>& table) {
+  DCHECK_EQ(table.size(), kUpdateMarker);
+  const int flat_index = ToFlatIndex(cell_index);
+  uint16* cell = &(*mutable_correspondence_cost_cells())[flat_index];
+  if (*cell >= kUpdateMarker) {
     return false;
   }
-  mutable_update_indices()->push_back(flat_index);                              
-  //并将位姿序号更新到全局位姿序号
+  mutable_update_indices()->push_back(flat_index);
   *cell = table[*cell];
   DCHECK_GE(*cell, kUpdateMarker);
-  mutable_known_cells_box()->extend(cell_index.matrix());     
-    //mutable_known_cells_box()是Grid2D的成员函数，返回存放已知概率值的一个子区域的盒子。
-  // 现在就是把该cell放入已知概率值的盒子中                  
-  //扩展已知网格边界
+  mutable_known_cells_box()->extend(cell_index.matrix());
   return true;
 }
-// ----------------------------------GetGridType()---------------------------------------
-// 获取栅格类型 覆盖概率栅格类型
-GridType ProbabilityGrid::GetGridType() const 
-{
+
+GridType ProbabilityGrid::GetGridType() const {
   return GridType::PROBABILITY_GRID;
 }
-// ----------------------------------GetProbability---------------------------------------
+
 // Returns the probability of the cell with 'cell_index'.
-float ProbabilityGrid::GetProbability(const Eigen::Array2i& cell_index) const
-{
+float ProbabilityGrid::GetProbability(const Eigen::Array2i& cell_index) const {
   if (!limits().Contains(cell_index)) return kMinProbability;
-  return CorrespondenceCostToProbability(
-    ValueToCorrespondenceCost(
-      correspondence_cost_cells()[ToFlatIndex(cell_index)])); 
-//首先将二维坐标转序号 
- //根据序号查找该栅格的空闲概率[1-32767]
- //空闲概率[1-32767]转float空闲概率
- //再把空闲float型概率转占用概率
+  return CorrespondenceCostToProbability(ValueToCorrespondenceCost(
+      correspondence_cost_cells()[ToFlatIndex(cell_index)]));
 }
 
 proto::Grid2D ProbabilityGrid::ToProto() const {
@@ -131,28 +92,19 @@ proto::Grid2D ProbabilityGrid::ToProto() const {
 std::unique_ptr<Grid2D> ProbabilityGrid::ComputeCroppedGrid() const {
   Eigen::Array2i offset;
   CellLimits cell_limits;
-  ComputeCroppedLimits(&offset, &cell_limits);                                  
-  //获取再全局地图的边界的起点边和终点
-  const double resolution = limits().resolution();                              
-  //边界 的分辨率
+  ComputeCroppedLimits(&offset, &cell_limits);
+  const double resolution = limits().resolution();
   const Eigen::Vector2d max =
-      limits().max() - resolution * Eigen::Vector2d(offset.y(), offset.x());    
-      //通过将边界值减去原点值,就可以求出最大坐标距离
-  std::unique_ptr<ProbabilityGrid> cropped_grid =                               
-  //创建概率对象
+      limits().max() - resolution * Eigen::Vector2d(offset.y(), offset.x());
+  std::unique_ptr<ProbabilityGrid> cropped_grid =
       absl::make_unique<ProbabilityGrid>(
           MapLimits(resolution, max, cell_limits), conversion_tables_);
-  for (const Eigen::Array2i& xy_index : XYIndexRangeIterator(cell_limits)) 
-  {
-    if (!IsKnown(xy_index + offset)) continue;                                  
-    //如果再limit范围内的点没查找到对应空闲概率,直接退出
-    cropped_grid->SetProbability(xy_index, GetProbability(xy_index + offset));   
-    //给剪切概率容器 的坐标位置设置空闲概率值
+  for (const Eigen::Array2i& xy_index : XYIndexRangeIterator(cell_limits)) {
+    if (!IsKnown(xy_index + offset)) continue;
+    cropped_grid->SetProbability(xy_index, GetProbability(xy_index + offset));
   }
 
-  return std::unique_ptr<Grid2D>(cropped_grid.release());                         
-  //release()是一个释放捕捉的函数
-  //所以释放了指向刚刚设置有空闲概率的部分???????
+  return std::unique_ptr<Grid2D>(cropped_grid.release());
 }
 
 bool ProbabilityGrid::DrawToSubmapTexture(

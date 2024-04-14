@@ -112,7 +112,18 @@ class PoseGraph : public PoseGraphInterface {
   // Gets the current trajectory clusters.
   virtual std::vector<std::vector<int>> GetConnectedTrajectories() const = 0;
 
+  // Returns the current optimized transform and submap itself for the given
+  // 'submap_id'. Returns 'nullptr' for the 'submap' member if the submap does
+  // not exist (anymore).
+  virtual SubmapData GetSubmapData(const SubmapId& submap_id) const = 0;
+
   proto::PoseGraph ToProto(bool include_unfinished_submaps) const override;
+
+    //okagv
+  proto::PoseGraph ToProtoWithId(int trajectory_id, bool include_unfinished_submaps) const override;
+
+  //okagv
+  proto::PoseGraph ToProtoWithUpdate(bool include_unfinished_submaps) const override;
 
   // Returns the IMU data.
   virtual sensor::MapByTime<sensor::ImuData> GetImuData() const = 0;
@@ -134,6 +145,9 @@ class PoseGraph : public PoseGraphInterface {
                                         int to_trajectory_id,
                                         const transform::Rigid3d& pose,
                                         const common::Time time) = 0;
+
+  //okagv
+  virtual sensor::MapByTime<sensor::ImuData> GetImuDataAfterUpdate() const = 0;
 };
 
 std::vector<PoseGraph::Constraint> FromProto(

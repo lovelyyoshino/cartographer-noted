@@ -47,6 +47,9 @@ message ConstraintBuilderOptions {
   // If enabled, logs information of loop-closing constraints for debugging.
   bool log_matches = 8;
 
+  //okagv
+  double max_match_variety_distance = 3;
+
   // Options for the internally used scan matchers.
   mapping.scan_matching.proto.FastCorrelativeScanMatcherOptions2D
       fast_correlative_scan_matcher_options = 9;

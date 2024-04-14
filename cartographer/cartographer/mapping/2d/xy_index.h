@@ -56,7 +56,7 @@ class XYIndexRangeIterator
     : public std::iterator<std::input_iterator_tag, Eigen::Array2i> {
  public:
   // Constructs a new iterator for the specified range.
-  XYIndexRangeIterator(const Eigen::Array2i& min_xy_index,                    // 将最远点和最近点的左边赋值到全局变量坐标点
+  XYIndexRangeIterator(const Eigen::Array2i& min_xy_index,
                        const Eigen::Array2i& max_xy_index)
       : min_xy_index_(min_xy_index),
         max_xy_index_(max_xy_index),

@@ -45,6 +45,15 @@
 #include "cartographer/cloud/internal/sensor/serialization.h"
 #include "glog/logging.h"
 
+//okagv
+#include "cartographer/cloud/internal/handlers/okagv_finish_trajectory.h"
+#include "cartographer/cloud/internal/handlers/okagv_start_trajectory.h"
+#include "cartographer/cloud/internal/handlers/okagv_get_order.h"
+#include "cartographer/cloud/internal/handlers/okagv_wait_trajectory.h"
+#include "cartographer/cloud/internal/handlers/okagv_localize_trajectory.h"
+#include "cartographer/cloud/internal/handlers/okagv_save_trajectory.h"
+#include "cartographer/cloud/internal/handlers/okagv_get_trajectory_state.h"
+
 namespace cartographer {
 namespace cloud {
 namespace {
@@ -57,8 +66,12 @@ const common::Duration kPopTimeout = common::FromMilliseconds(100);
 
 MapBuilderServer::MapBuilderServer(
     const proto::MapBuilderServerOptions& map_builder_server_options,
-    std::unique_ptr<mapping::MapBuilderInterface> map_builder)
-    : map_builder_(std::move(map_builder)) {
+    std::shared_ptr<mapping::MapBuilderInterface> map_builder) 
+    : map_builder_(std::move(map_builder)) { //okagv default is std::move(map_builder
+
+  //LOG(INFO) << "okagv construct mapbuilder_server";
+  map_builder_server_options.map_builder_options();
+
   async_grpc::Server::Builder server_builder;
   server_builder.SetServerAddress(map_builder_server_options.server_address());
   server_builder.SetNumGrpcThreads(
@@ -83,8 +96,7 @@ MapBuilderServer::MapBuilderServer(
   server_builder.RegisterHandler<handlers::AddSensorDataBatchHandler>();
   server_builder.RegisterHandler<handlers::FinishTrajectoryHandler>();
   server_builder.RegisterHandler<handlers::DeleteTrajectoryHandler>();
-  server_builder
-      .RegisterHandler<handlers::ReceiveGlobalSlamOptimizationsHandler>();
+  server_builder.RegisterHandler<handlers::ReceiveGlobalSlamOptimizationsHandler>();
   server_builder.RegisterHandler<handlers::ReceiveLocalSlamResultsHandler>();
   server_builder.RegisterHandler<handlers::GetSubmapHandler>();
   server_builder.RegisterHandler<handlers::GetTrajectoryNodePosesHandler>();
@@ -101,7 +113,21 @@ MapBuilderServer::MapBuilderServer(
   server_builder.RegisterHandler<handlers::WriteStateHandler>();
   server_builder.RegisterHandler<handlers::WriteStateToFileHandler>();
   server_builder.RegisterHandler<handlers::SetLandmarkPoseHandler>();
+
+  //okagv
+  server_builder.RegisterHandler<handlers::OKagvFinishTrajectoryHandler>();
+  server_builder.RegisterHandler<handlers::OKagvStartTrajectoryHandler>();
+  server_builder.RegisterHandler<handlers::OKagvGetOrderHandler>();
+  server_builder.RegisterHandler<handlers::OKagvWaitTrajectoryHandler>();
+  server_builder.RegisterHandler<handlers::OKagvLocalizeTrajectoryHandler>();
+  server_builder.RegisterHandler<handlers::OKagvSaveTrajectoryHandler>();
+  server_builder.RegisterHandler<handlers::OKagvGetTrajectoryStateHandler>();
+
   grpc_server_ = server_builder.Build();
+
+  //okagv
+  root_file_directory = map_builder_server_options.root_file_directory();
+
   if (map_builder_server_options.map_builder_options()
           .use_trajectory_builder_2d()) {
     grpc_server_->SetExecutionContext(
@@ -127,7 +153,8 @@ void MapBuilderServer::Start() {
   if (local_trajectory_uploader_) {
     local_trajectory_uploader_->Start();
   }
-  StartSlamThread();
+  //StartSlamThread();
+  //LOG(INFO) << "Starting SLAM thread.";
   grpc_server_->Start();
 }
 

@@ -10,9 +10,9 @@ void RegisterMapBuilderServerMetrics(metrics::FamilyFactory* factory) {
   MapBuilderServer::RegisterMetrics(factory);
 }
 
-std::unique_ptr<MapBuilderServerInterface> CreateMapBuilderServer(
+std::unique_ptr<MapBuilderServerInterface> CreateMapBuilderServer(  //okagv default is unique_ptr
     const proto::MapBuilderServerOptions& map_builder_server_options,
-    std::unique_ptr<mapping::MapBuilderInterface> map_builder) {
+    std::shared_ptr<mapping::MapBuilderInterface> map_builder) {
   return absl::make_unique<MapBuilderServer>(map_builder_server_options,
                                              std::move(map_builder));
 }

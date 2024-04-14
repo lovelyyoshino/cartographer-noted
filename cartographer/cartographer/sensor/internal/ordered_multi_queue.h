@@ -23,7 +23,7 @@
 #include <string>
 #include <tuple>
 
-#include "cartographer/common/internal/blocking_queue.h"
+#include "cartographer/common/blocking_queue.h"
 #include "cartographer/common/port.h"
 #include "cartographer/common/time.h"
 #include "cartographer/sensor/internal/dispatchable.h"
@@ -75,6 +75,9 @@ class OrderedMultiQueue {
   // key of a queue that needs more data before the OrderedMultiQueue can
   // dispatch data.
   QueueKey GetBlocker() const;
+
+  //okagv
+  void DeleteQueue(QueueKey& queue_key);
 
  private:
   struct Queue {

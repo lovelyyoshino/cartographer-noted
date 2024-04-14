@@ -42,9 +42,8 @@ class PoseExtrapolator : public PoseExtrapolatorInterface {
   PoseExtrapolator& operator=(const PoseExtrapolator&) = delete;
 
   static std::unique_ptr<PoseExtrapolator> InitializeWithImu(
-                                                common::Duration pose_queue_duration, 
-                                                double imu_gravity_time_constant,
-                                                const sensor::ImuData& imu_data);
+      common::Duration pose_queue_duration, double imu_gravity_time_constant,
+      const sensor::ImuData& imu_data);
 
   // Returns the time of the last added pose or Time::min() if no pose was added
   // yet.
@@ -77,25 +76,20 @@ class PoseExtrapolator : public PoseExtrapolatorInterface {
     common::Time time;
     transform::Rigid3d pose;
   };
-  std::deque<TimedPose> timed_pose_queue_;//时间位姿队列
-  Eigen::Vector3d linear_velocity_from_poses_ = Eigen::Vector3d::Zero();//位姿估计的线速度
-  Eigen::Vector3d angular_velocity_from_poses_ = Eigen::Vector3d::Zero();//位姿估计的角速度
+  std::deque<TimedPose> timed_pose_queue_;
+  Eigen::Vector3d linear_velocity_from_poses_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d angular_velocity_from_poses_ = Eigen::Vector3d::Zero();
 
-  const double gravity_time_constant_;//????????????/
+  const double gravity_time_constant_;
   std::deque<sensor::ImuData> imu_data_;
-  //????????????区别
-  // 其中imu_tracker_在AddPose中使用, 
-  // odometry_imu_tracker_在AddOdometryData中计算旋转的时候使用,
-  // 最后一个则是在ExtrapolatePose中推算旋转时使用
   std::unique_ptr<ImuTracker> imu_tracker_;
   std::unique_ptr<ImuTracker> odometry_imu_tracker_;
   std::unique_ptr<ImuTracker> extrapolation_imu_tracker_;
+  TimedPose cached_extrapolated_pose_;
 
-  TimedPose cached_extrapolated_pose_;//缓存的一个带时间的Pose
-
-  std::deque<sensor::OdometryData> odometry_data_;//里程计数据
-  Eigen::Vector3d linear_velocity_from_odometry_ = Eigen::Vector3d::Zero();//里程计估计的线速度
-  Eigen::Vector3d angular_velocity_from_odometry_ = Eigen::Vector3d::Zero();//里程计估计的角速度
+  std::deque<sensor::OdometryData> odometry_data_;
+  Eigen::Vector3d linear_velocity_from_odometry_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d angular_velocity_from_odometry_ = Eigen::Vector3d::Zero();
 };
 
 }  // namespace mapping

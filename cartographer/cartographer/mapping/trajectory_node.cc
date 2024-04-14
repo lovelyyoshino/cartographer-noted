@@ -24,56 +24,48 @@
 namespace cartographer {
 namespace mapping {
 
-proto::TrajectoryNodeData ToProto(const TrajectoryNode::Data& constant_data) 
-{
-  proto::TrajectoryNodeData proto;                                           //创建轨迹节点 proto 流
+proto::TrajectoryNodeData ToProto(const TrajectoryNode::Data& constant_data) {
+  proto::TrajectoryNodeData proto;
   proto.set_timestamp(common::ToUniversal(constant_data.time));
-  *proto.mutable_gravity_alignment() =                                       //在重力方向投影点云
+  *proto.mutable_gravity_alignment() =
       transform::ToProto(constant_data.gravity_alignment);
-  *proto.mutable_filtered_gravity_aligned_point_cloud() =                    //经过滤波并在重力方向投影点云
+  *proto.mutable_filtered_gravity_aligned_point_cloud() =
       sensor::CompressedPointCloud(
-          constant_data.filtered_gravity_aligned_point_cloud).ToProto();
-
-  *proto.mutable_high_resolution_point_cloud() =                              //高分辨率点云
-      sensor::CompressedPointCloud(constant_data.high_resolution_point_cloud).ToProto();
-
-  *proto.mutable_low_resolution_point_cloud() =                               //低分辨率点云
-      sensor::CompressedPointCloud(constant_data.low_resolution_point_cloud).ToProto();
-
+          constant_data.filtered_gravity_aligned_point_cloud)
+          .ToProto();
+  *proto.mutable_high_resolution_point_cloud() =
+      sensor::CompressedPointCloud(constant_data.high_resolution_point_cloud)
+          .ToProto();
+  *proto.mutable_low_resolution_point_cloud() =
+      sensor::CompressedPointCloud(constant_data.low_resolution_point_cloud)
+          .ToProto();
   for (Eigen::VectorXf::Index i = 0;
-       i != constant_data.rotational_scan_matcher_histogram.size(); ++i)      ////添加旋转匹配直方图   VectorXf是一个长度可变的向量。
-  {
-    proto.add_rotational_scan_matcher_histogram(                             
+       i != constant_data.rotational_scan_matcher_histogram.size(); ++i) {
+    proto.add_rotational_scan_matcher_histogram(
         constant_data.rotational_scan_matcher_histogram(i));
   }
-  *proto.mutable_local_pose() = transform::ToProto(constant_data.local_pose); //添加局部slam位姿
+  *proto.mutable_local_pose() = transform::ToProto(constant_data.local_pose);
   return proto;
 }
 
-// -----------------------------FromProto-------------------------------------
-// 读取proto在轨迹节点的数据
-TrajectoryNode::Data FromProto(const proto::TrajectoryNodeData& proto) 
-{
+TrajectoryNode::Data FromProto(const proto::TrajectoryNodeData& proto) {
   Eigen::VectorXf rotational_scan_matcher_histogram(
       proto.rotational_scan_matcher_histogram_size());
-  for (int i = 0; i != proto.rotational_scan_matcher_histogram_size(); ++i) //旋转匹配直方图
-  {
+  for (int i = 0; i != proto.rotational_scan_matcher_histogram_size(); ++i) {
     rotational_scan_matcher_histogram(i) =
         proto.rotational_scan_matcher_histogram(i);
   }
-  return TrajectoryNode::Data                                              ////时间 　旋转矩阵　点云数据　　局部slam位姿
-  {
+  return TrajectoryNode::Data{
       common::FromUniversal(proto.timestamp()),
       transform::ToEigen(proto.gravity_alignment()),
       sensor::CompressedPointCloud(proto.filtered_gravity_aligned_point_cloud())
-                                              .Decompress(),
+          .Decompress(),
       sensor::CompressedPointCloud(proto.high_resolution_point_cloud())
-                                              .Decompress(),
+          .Decompress(),
       sensor::CompressedPointCloud(proto.low_resolution_point_cloud())
-                                              .Decompress(),
+          .Decompress(),
       rotational_scan_matcher_histogram,
-      transform::ToRigid3(proto.local_pose())
-  };
+      transform::ToRigid3(proto.local_pose())};
 }
 
 }  // namespace mapping

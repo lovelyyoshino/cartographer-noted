@@ -12,9 +12,15 @@
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   See the License for the specific language governing permissions and
   limitations under the License.
+
+  -load_state_filename $(arg load_state_filename)
+
 -->
 
 <launch>
+  <arg name="bag_filename" default="/home/peak/Downloads/ros_bag/carto/b0-2014-07-11-10-58-16.bag"/>
+  <arg name="load_state_filename" default="/home/peak/Downloads/ros_bag/carto/b0-2014-07-11-10-58-16.bag.pbstream"/>
+
   <param name="/use_sim_time" value="true" />
 
   <param name="robot_description"
@@ -27,8 +33,9 @@
       type="cartographer_grpc_node" args="
 	  -client_id CLIENT_ID
           -configuration_directory $(find cartographer_ros)/configuration_files
-          -configuration_basename backpack_2d.lua
-          -map_filename $(arg map_filename)"
+          -configuration_basename backpack_2d_localization.lua
+          -load_state_filename $(arg load_state_filename)
+          -server_address 0.0.0.0:50051"
       output="screen">
     <remap from="echoes" to="horizontal_laser_2d" />
   </node>

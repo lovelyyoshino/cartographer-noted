@@ -28,6 +28,7 @@
 #include "cartographer/mapping/id.h"
 #include "cartographer/mapping/internal/3d/pose_graph_3d.h"
 #include "cartographer/mapping/internal/3d/scan_matching/rotational_scan_matcher.h"
+#include "cartographer/mapping/map_builder.h"
 #include "cartographer/mapping/map_builder_interface.h"
 #include "cartographer/mapping/pose_graph.h"
 #include "cartographer/mapping/probability_values.h"
@@ -73,13 +74,14 @@ void MigrateStreamVersion1ToVersion2(
   const auto& all_builder_options_proto =
       deserializer.all_trajectory_builder_options();
 
-  std::vector<mapping::proto::TrajectoryBuilderOptionsWithSensorIds>
+  std::map<int, mapping::proto::TrajectoryBuilderOptionsWithSensorIds>
       trajectory_builder_options;
   for (int i = 0; i < pose_graph_proto.trajectory_size(); ++i) {
     auto& trajectory_proto = *pose_graph_proto.mutable_trajectory(i);
     const auto& options_with_sensor_ids_proto =
         all_builder_options_proto.options_with_sensor_ids(i);
-    trajectory_builder_options.push_back(options_with_sensor_ids_proto);
+    //okagv
+    trajectory_builder_options.at(trajectory_proto.trajectory_id()) = (options_with_sensor_ids_proto);
     CHECK_EQ(trajectory_proto.trajectory_id(), i);
   }
 

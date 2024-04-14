@@ -50,6 +50,11 @@ class Trimmable {
   // Sets the state for a specific trajectory.
   virtual void SetTrajectoryState(
       int trajectory_id, PoseGraphInterface::TrajectoryState state) = 0;
+
+  //okagv
+  virtual std::vector<NodeId> GetNodeIds(int trajectory_id) const = 0;
+  //okagv
+  virtual void TrimNode(const NodeId& node_id) = 0;
 };
 
 // An interface to implement algorithms that choose how to trim the pose graph.
@@ -62,6 +67,10 @@ class PoseGraphTrimmer {
 
   // Checks if this trimmer is in a terminatable state.
   virtual bool IsFinished() = 0;
+
+  // Okagv
+  virtual void CheckRemovedSubmapId(Trimmable* pose_graph) = 0;
+
 };
 
 // Keeps the last 'num_submaps_to_keep' of the trajectory with 'trajectory_id'
@@ -73,7 +82,8 @@ class PureLocalizationTrimmer : public PoseGraphTrimmer {
 
   void Trim(Trimmable* pose_graph) override;
   bool IsFinished() override;
-
+  void CheckRemovedSubmapId(Trimmable* pose_graph) override;
+  
  private:
   const int trajectory_id_;
   int num_submaps_to_keep_;

@@ -14,6 +14,9 @@
 
 cmake_minimum_required(VERSION 2.8.12)  # Ships with Ubuntu 14.04 (Trusty)
 
+#set(CMAKE_EXE_LINKER_FLAGS "-static")
+#set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+
 project(cartographer_ros)
 
 set(PACKAGE_DEPENDENCIES
@@ -34,6 +37,9 @@ set(PACKAGE_DEPENDENCIES
   visualization_msgs
 )
 
+# okagv
+find_package(async_grpc REQUIRED)
+
 if(WIN32)
   set(Boost_USE_STATIC_LIBS FALSE)
 endif()
@@ -46,7 +52,7 @@ find_package(PCL REQUIRED COMPONENTS common)
 
 find_package(cartographer REQUIRED)
 include("${CARTOGRAPHER_CMAKE_DIR}/functions.cmake")
-option(BUILD_GRPC "build features that require Cartographer gRPC support" false)
+option(BUILD_GRPC "build features that require Cartographer gRPC support" true)  #defaullt is false,peak.ding change to true
 google_initialize_cartographer_project()
 google_enable_testing()
 set(CARTOGRAPHER_GMOCK_LIBRARIES ${GMOCK_LIBRARIES})
@@ -134,6 +140,12 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${Boost_LIBRARIES})
 target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC ${catkin_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${catkin_LIBRARIES})
 add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
+
+#okagv
+target_link_libraries(${PROJECT_NAME} PUBLIC async_grpc)
+
+#okagv
+#target_link_libraries(${PROJECT_NAME} PUBLIC ${Abseil_LIBRARIES})
 
 # Add the binary directory first, so that port.h is included after it has
 # been generated.

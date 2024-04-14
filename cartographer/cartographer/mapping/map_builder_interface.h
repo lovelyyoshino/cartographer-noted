@@ -27,27 +27,44 @@
 #include "cartographer/io/proto_stream_interface.h"
 #include "cartographer/mapping/id.h"
 #include "cartographer/mapping/pose_graph_interface.h"
-#include "cartographer/mapping/proto/map_builder_options.pb.h"
 #include "cartographer/mapping/proto/submap_visualization.pb.h"
 #include "cartographer/mapping/proto/trajectory_builder_options.pb.h"
 #include "cartographer/mapping/submaps.h"
 #include "cartographer/mapping/trajectory_builder_interface.h"
 
+//okagv
+#include "cartographer/mapping/pose_extrapolator_interface.h"
+#include "cartographer/mapping/proto/map_builder_options.pb.h"
+
 namespace cartographer {
 namespace mapping {
 
-proto::MapBuilderOptions CreateMapBuilderOptions(
-    common::LuaParameterDictionary* const parameter_dictionary);
-
 // This interface is used for both library and RPC implementations.
 // Implementations wire up the complete SLAM stack.
-class MapBuilderInterface {//被定义到namespace cartographer和namespace mapping 
-                           ///map_builder_interface.cpp中完成
+class MapBuilderInterface {
+
+//okagv
+struct OkagvOrderStartTrajectory{
+     std::string trajectory_type;
+     std::string trajectory_id;
+     bool use_initial_pose;
+     ::cartographer::transform::Rigid3d initial_pose;
+     std::string relative_to_trajectory_id;
+};
+
+//okagv
+struct OkagvOrderSaveTrajectory{
+      std::string filename;
+      bool include_unfinished_submaps;
+};
+
  public:
   using LocalSlamResultCallback =
       TrajectoryBuilderInterface::LocalSlamResultCallback;
 
   using SensorId = TrajectoryBuilderInterface::SensorId;
+
+  enum class TrajectoryType { SLAM, LOAD, NAVIGATION, RELOCALIZAION, IDLE, ABORTION};
 
   MapBuilderInterface() {}
   virtual ~MapBuilderInterface() {}
@@ -56,15 +73,13 @@ class MapBuilderInterface {//被定义到namespace cartographer和namespace mapp
   MapBuilderInterface& operator=(const MapBuilderInterface&) = delete;
 
   // Creates a new trajectory builder and returns its index.
-//   创建一个TrajectoryBuilder并返回他的index，即trajectory_id
   virtual int AddTrajectoryBuilder(
       const std::set<SensorId>& expected_sensor_ids,
       const proto::TrajectoryBuilderOptions& trajectory_options,
-      LocalSlamResultCallback local_slam_result_callback) = 0;            //LocalSlamResultCallback是一个回调函数
+      LocalSlamResultCallback local_slam_result_callback) = 0;
 
   // Creates a new trajectory and returns its index. Querying the trajectory
   // builder for it will return 'nullptr'.
-//   只有一个参数，就是序列化的数据
   virtual int AddTrajectoryForDeserialization(
       const proto::TrajectoryBuilderOptionsWithSensorIds&
           options_with_sensor_ids_proto) = 0;
@@ -72,8 +87,6 @@ class MapBuilderInterface {//被定义到namespace cartographer和namespace mapp
   // Returns the 'TrajectoryBuilderInterface' corresponding to the specified
   // 'trajectory_id' or 'nullptr' if the trajectory has no corresponding
   // builder.
-   // 根据trajectory_id返回一个TrajectoryBuilderInterface的指针。
-  // 如果该trajectory没有一个TrajectoryBuilder，则返回nullptr' corresponding to the specified
   virtual mapping::TrajectoryBuilderInterface* GetTrajectoryBuilder(
       int trajectory_id) const = 0;
 
@@ -90,7 +103,6 @@ class MapBuilderInterface {//被定义到namespace cartographer和namespace mapp
   // 'include_unfinished_submaps' is set to true, unfinished submaps, i.e.
   // submaps that have not yet received all rangefinder data insertions, will
   // be included in the serialized state.
-    // 序列化当前状态到一个proto流中。
   virtual void SerializeState(bool include_unfinished_submaps,
                               io::ProtoStreamWriterInterface* writer) = 0;
 
@@ -104,22 +116,51 @@ class MapBuilderInterface {//被定义到namespace cartographer和namespace mapp
 
   // Loads the SLAM state from a proto stream. Returns the remapping of new
   // trajectory_ids.
-//   // 从一个proto流中加载SLAM状态
   virtual std::map<int /* trajectory id in proto */, int /* trajectory id */>
-  LoadState(io::ProtoStreamReaderInterface* reader, bool load_frozen_state) = 0;
+  LoadState(io::ProtoStreamReaderInterface* reader, const cartographer::mapping::PoseGraphInterface::TrajectoryState& state) = 0;
 
   // Loads the SLAM state from a pbstream file. Returns the remapping of new
   // trajectory_ids.
-  
-  virtual std::map<int /* trajectory id in proto */, int /* trajectory id */>      //加载pbstream文件,并返回轨迹int
-  LoadStateFromFile(const std::string& filename, bool load_frozen_state) = 0;
+  virtual std::map<int /* trajectory id in proto */, int /* trajectory id */>
+  LoadStateFromFile(const std::string& filename, const cartographer::mapping::PoseGraphInterface::TrajectoryState& state) = 0;
 
   virtual int num_trajectory_builders() const = 0;
 
   virtual mapping::PoseGraphInterface* pose_graph() = 0;
 
-  virtual const std::vector<proto::TrajectoryBuilderOptionsWithSensorIds>&
+  virtual const std::map<int, proto::TrajectoryBuilderOptionsWithSensorIds>&
   GetAllTrajectoryBuilderOptions() const = 0;
+
+  //okagv
+  virtual void SetTrajectoryTypeWithId(TrajectoryType type, int id) = 0;
+
+  //okagv
+  virtual TrajectoryType GetTrajectoryTypeWithId(int id) = 0;
+
+  //okagv
+  virtual  void DeleteTrajectory(int trajectory_id) = 0;
+
+  //okagv
+  virtual  bool SerializeStateToFileWithId(int trajectory_id,
+                            bool include_unfinished_submaps,
+                            const std::string &filename) = 0;
+  //okagv
+  virtual bool SerializeStateToFileAfterUpdate(bool include_unfinished_submaps,
+                                    const std::string& filename) = 0;
+
+  //okagv
+  virtual TrajectoryType GetWorkingTrajectoryType() = 0;
+
+  virtual int GetTrajectoryIdByName(std::string name) = 0;
+
+  //okagv
+  virtual void RegisterClientIdForTrajectory(const std::string& client_id, int trajectory_id) = 0;
+
+   //okagv
+   OkagvOrderStartTrajectory okagv_order_start_trajectory_;
+   OkagvOrderSaveTrajectory okagv_order_save_trajectory_;
+
+   virtual void SetMapBuilderOptions(proto::MapBuilderOptions &option_reset) = 0;
 };
 
 }  // namespace mapping

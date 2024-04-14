@@ -29,7 +29,9 @@ PureLocalizationTrimmer::PureLocalizationTrimmer(const int trajectory_id,
 
 void PureLocalizationTrimmer::Trim(Trimmable* const pose_graph) {
   if (pose_graph->IsFinished(trajectory_id_)) {
-    num_submaps_to_keep_ = 0;
+    //num_submaps_to_keep_ = 0;
+    //okagv
+    num_submaps_to_keep_ = 3;  
   }
 
   auto submap_ids = pose_graph->GetSubmapIds(trajectory_id_);
@@ -39,12 +41,21 @@ void PureLocalizationTrimmer::Trim(Trimmable* const pose_graph) {
 
   if (num_submaps_to_keep_ == 0) {
     finished_ = true;
+
+    //okagv ,do not delete directly;
+    /*
     pose_graph->SetTrajectoryState(
         trajectory_id_, PoseGraphInterface::TrajectoryState::DELETED);
+        */
   }
 }
 
 bool PureLocalizationTrimmer::IsFinished() { return finished_; }
+
+void PureLocalizationTrimmer::CheckRemovedSubmapId(Trimmable* pose_graph) 
+{
+  return;
+}
 
 }  // namespace mapping
 }  // namespace cartographer

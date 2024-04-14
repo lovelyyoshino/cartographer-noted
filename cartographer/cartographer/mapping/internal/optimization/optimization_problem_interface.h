@@ -80,6 +80,8 @@ class OptimizationProblemInterface {
   virtual const sensor::MapByTime<sensor::ImuData>& imu_data() const = 0;
   virtual const sensor::MapByTime<sensor::OdometryData>& odometry_data()
       const = 0;
+
+  virtual const sensor::MapByTime<sensor::ImuData>& imu_data_after_update() = 0;
 };
 
 }  // namespace optimization

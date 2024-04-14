@@ -31,6 +31,10 @@ proto::LandmarkData ToProto(const LandmarkData& landmark_data) {
         transform::ToProto(observation.landmark_to_tracking_transform);
     item->set_translation_weight(observation.translation_weight);
     item->set_rotation_weight(observation.rotation_weight);
+
+    //okagv
+    *item->mutable_landmark_to_map_transform() = 
+        transform::ToProto(landmark_data.global_landmark_pose);
   }
   return proto;
 }

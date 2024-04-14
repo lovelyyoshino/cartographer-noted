@@ -22,20 +22,12 @@ namespace cartographer_ros {
 
 std::vector<std::string> ComputeRepeatedTopicNames(const std::string& topic,
                                                    const int num_topics) {
-  CHECK_GE(num_topics, 0);//EQ即great equation，意为“大于等于”，函数判断是否x大于等于y，当x>=y时，函数打印出x>=y。
-                            // #define CHECK_EQ(x,y) CHECK_OP(x,y,EQ,==)
-                            // #define CHECK_NE(x,y) CHECK_OP(x,y,NE,!=)
-                            // #define CHECK_LE(x,y) CHECK_OP(x,y,LE,<=)
-                            // #define CHECK_LT(x,y) CHECK_OP(x,y,LT,<)
-                            // #define CHECK_GE(x,y) CHECK_OP(x,y,GE,>=)
-                            // #define CHECK_GT(x,y) CHECK_OP(x,y,GT,>)
-
+  CHECK_GE(num_topics, 0);
   if (num_topics == 1) {
     return {topic};
   }
-  std::vector<std::string> topics;//定义字符串容器
-  topics.reserve(num_topics); //reserve() 为容器预留足够的空间，避免不必要的重复分配。
-                              //预留空间大于等于字符串的长度。
+  std::vector<std::string> topics;
+  topics.reserve(num_topics);
   for (int i = 0; i < num_topics; ++i) {
     topics.emplace_back(topic + "_" + std::to_string(i + 1));
   }

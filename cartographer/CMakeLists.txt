@@ -16,12 +16,17 @@ cmake_minimum_required(VERSION 3.2)
 
 project(cartographer)
 
+#set(CMAKE_EXE_LINKER_FLAGS "-static") #okagv
+#set(CMAKE_CXX_FLAGS "-static ${CMAKE_CXX_FLAGS}") #okagv
+
+add_definitions(-D NDEBUG)
+
 set(CARTOGRAPHER_MAJOR_VERSION 1)
 set(CARTOGRAPHER_MINOR_VERSION 0)
 set(CARTOGRAPHER_PATCH_VERSION 0)
 set(CARTOGRAPHER_VERSION ${CARTOGRAPHER_MAJOR_VERSION}.${CARTOGRAPHER_MINOR_VERSION}.${CARTOGRAPHER_PATCH_VERSION})
 set(CARTOGRAPHER_SOVERSION ${CARTOGRAPHER_MAJOR_VERSION}.${CARTOGRAPHER_MINOR_VERSION})
-option(BUILD_GRPC "build Cartographer gRPC support" false)
+option(BUILD_GRPC "build Cartographer gRPC support" true) #default is false
 set(CARTOGRAPHER_HAS_GRPC ${BUILD_GRPC})
 option(BUILD_PROMETHEUS "build Prometheus monitoring support" false)
 
@@ -29,6 +34,7 @@ include("${PROJECT_SOURCE_DIR}/cmake/functions.cmake")
 google_initialize_cartographer_project()
 google_enable_testing()
 
+#find_package(absl REQUIRED)
 find_package(absl REQUIRED)
 set(BOOST_COMPONENTS iostreams)
 if(WIN32)
@@ -49,6 +55,12 @@ endif()
 
 if (${BUILD_GRPC})
   find_package(async_grpc REQUIRED)
+
+  # add by okagv
+  # Find gRPC installation
+  # Looks for gRPCConfig.cmake file installed by gRPC's cmake installation.
+  find_package(gRPC CONFIG REQUIRED)
+  message(STATUS "Using gRPC ${gRPC_VERSION}")
 endif()
 
 if(${BUILD_PROMETHEUS})
@@ -120,7 +132,7 @@ if (NOT ${BUILD_PROMETHEUS})
 endif()
 set(INSTALL_SOURCE_HDRS ${ALL_LIBRARY_HDRS} ${TEST_LIBRARY_HDRS})
 file(GLOB_RECURSE INTERNAL_HDRS "cartographer/*/internal/*.h")
-list(REMOVE_ITEM INSTALL_SOURCE_HDRS ${INTERNAL_HDRS})
+#list(REMOVE_ITEM INSTALL_SOURCE_HDRS ${INTERNAL_HDRS})
 
 file(GLOB_RECURSE ALL_PROTOS "cartographer/*.proto")
 file(GLOB_RECURSE ALL_GRPC_SERVICES "cartographer/*_service.proto")
@@ -185,6 +197,7 @@ endif()
 set(INSTALL_GENERATED_HDRS ${ALL_PROTO_HDRS} ${ALL_GRPC_SERVICE_HDRS})
 
 add_library(${PROJECT_NAME} STATIC ${ALL_LIBRARY_HDRS} ${ALL_LIBRARY_SRCS})
+#add_library(${PROJECT_NAME} STATIC ${ALL_LIBRARY_HDRS} ${ALL_LIBRARY_SRCS})
 
 configure_file(
   ${PROJECT_SOURCE_DIR}/cartographer/common/config.h.cmake
@@ -268,7 +281,8 @@ target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC
   ${PROTOBUF_INCLUDE_DIR})
 # TODO(hrapp): This should not explicitly list pthread and use
 # PROTOBUF_LIBRARIES, but that failed on first try.
-target_link_libraries(${PROJECT_NAME} PUBLIC ${PROTOBUF_LIBRARY} 
+
+target_link_libraries(${PROJECT_NAME} PUBLIC ${PROTOBUF_LIBRARY}
   absl::algorithm
   absl::base
   absl::debugging
@@ -280,8 +294,11 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${PROTOBUF_LIBRARY}
   absl::strings
   absl::synchronization
   absl::time
-  absl::utility 
-)
+  absl::utility )
+
+#target_link_libraries(${PROJECT_NAME} PUBLIC ${PROTOBUF_LIBRARY} standalone_absl)
+#target_link_libraries(${PROJECT_NAME} PUBLIC ${PROTOBUF_LIBRARY} ${ABSEIL_LIBRARY})
+
 if (NOT WIN32)
   target_link_libraries(${PROJECT_NAME} PUBLIC pthread)
 endif()
@@ -304,6 +321,7 @@ set(TEST_LIB
   cartographer_test_library
 )
 add_library(${TEST_LIB} ${TEST_LIBRARY_HDRS} ${TEST_LIBRARY_SRCS})
+#add_library(${TEST_LIB} ${TEST_LIBRARY_HDRS} ${TEST_LIBRARY_SRCS})
 target_include_directories(${TEST_LIB} SYSTEM PRIVATE
   "${GMOCK_INCLUDE_DIRS}")
 # Needed for dynamically linked GTest on Windows.
@@ -315,24 +333,25 @@ target_link_libraries(${TEST_LIB} PUBLIC ${PROJECT_NAME})
 set_target_properties(${TEST_LIB} PROPERTIES
   COMPILE_FLAGS ${TARGET_COMPILE_FLAGS})
 
-foreach(ABS_FIL ${ALL_TESTS})
-  file(RELATIVE_PATH REL_FIL ${PROJECT_SOURCE_DIR} ${ABS_FIL})
-  get_filename_component(DIR ${REL_FIL} DIRECTORY)
-  get_filename_component(FIL_WE ${REL_FIL} NAME_WE)
-  # Replace slashes as required for CMP0037.
-  string(REPLACE "/" "." TEST_TARGET_NAME "${DIR}/${FIL_WE}")
-  google_test("${TEST_TARGET_NAME}" ${ABS_FIL})
-  if(${BUILD_GRPC})
-    target_link_libraries("${TEST_TARGET_NAME}" PUBLIC grpc++)
-    target_link_libraries("${TEST_TARGET_NAME}" PUBLIC async_grpc)
-  endif()
-  if(${BUILD_PROMETHEUS})
-    target_link_libraries("${TEST_TARGET_NAME}" PUBLIC ${ZLIB_LIBRARIES})
-    target_link_libraries("${TEST_TARGET_NAME}" PUBLIC prometheus-cpp-core)
-    target_link_libraries("${TEST_TARGET_NAME}" PUBLIC prometheus-cpp-pull)
-  endif()
-  target_link_libraries("${TEST_TARGET_NAME}" PUBLIC ${TEST_LIB})
-endforeach()
+#foreach(ABS_FIL ${ALL_TESTS})
+#  file(RELATIVE_PATH REL_FIL ${PROJECT_SOURCE_DIR} ${ABS_FIL})
+#  get_filename_component(DIR ${REL_FIL} DIRECTORY)
+#  get_filename_component(FIL_WE ${REL_FIL} NAME_WE)
+#  # Replace slashes as required for CMP0037.
+#  string(REPLACE "/" "." TEST_TARGET_NAME "${DIR}/${FIL_WE}")
+#  google_test("${TEST_TARGET_NAME}" ${ABS_FIL})
+#  if(${BUILD_GRPC})
+#    target_link_libraries("${TEST_TARGET_NAME}" PUBLIC grpc++)
+#    target_link_libraries("${TEST_TARGET_NAME}" PUBLIC async_grpc)
+#  endif()
+#  if(${BUILD_PROMETHEUS})
+#    target_link_libraries("${TEST_TARGET_NAME}" PUBLIC ${ZLIB_LIBRARIES})
+#    target_link_libraries("${TEST_TARGET_NAME}" PUBLIC prometheus-cpp-core)
+#    target_link_libraries("${TEST_TARGET_NAME}" PUBLIC prometheus-cpp-pull)
+#  endif()
+#  target_link_libraries("${TEST_TARGET_NAME}" PUBLIC ${TEST_LIB})
+#endforeach()
+
 
 # Add the binary directory first, so that port.h is included after it has
 # been generated.

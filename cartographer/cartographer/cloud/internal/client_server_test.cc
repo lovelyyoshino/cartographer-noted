@@ -21,21 +21,22 @@
 #include "cartographer/cloud/internal/map_builder_server.h"
 #include "cartographer/cloud/map_builder_server_options.h"
 #include "cartographer/io/internal/in_memory_proto_stream.h"
-#include "cartographer/io/internal/testing/test_helpers.h"
 #include "cartographer/io/proto_stream.h"
 #include "cartographer/io/proto_stream_deserializer.h"
-#include "cartographer/mapping/internal/local_slam_result_data.h"
+#include "cartographer/io/testing/test_helpers.h"
 #include "cartographer/mapping/internal/testing/mock_map_builder.h"
 #include "cartographer/mapping/internal/testing/mock_pose_graph.h"
 #include "cartographer/mapping/internal/testing/mock_trajectory_builder.h"
 #include "cartographer/mapping/internal/testing/test_helpers.h"
-#include "cartographer/mapping/map_builder.h"
+#include "cartographer/mapping/local_slam_result_data.h"
 #include "glog/logging.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include "cartographer/mapping/pose_graph_interface.h"
+
 using ::cartographer::io::testing::ProtoReaderFromStrings;
-using ::cartographer::mapping::CreateMapBuilder;
+using ::cartographer::mapping::MapBuilder;
 using ::cartographer::mapping::MapBuilderInterface;
 using ::cartographer::mapping::PoseGraphInterface;
 using ::cartographer::mapping::TrajectoryBuilderInterface;
@@ -140,15 +141,15 @@ class ClientServerTestBase : public T {
   }
 
   void InitializeRealServer() {
-    auto map_builder =
-        CreateMapBuilder(map_builder_server_options_.map_builder_options());
+    auto map_builder = absl::make_unique<MapBuilder>(
+        map_builder_server_options_.map_builder_options());
     server_ = absl::make_unique<MapBuilderServer>(map_builder_server_options_,
                                                   std::move(map_builder));
     EXPECT_TRUE(server_ != nullptr);
   }
 
   void InitializeRealUploadingServer() {
-    auto map_builder = CreateMapBuilder(
+    auto map_builder = absl::make_unique<MapBuilder>(
         uploading_map_builder_server_options_.map_builder_options());
     uploading_server_ = absl::make_unique<MapBuilderServer>(
         uploading_map_builder_server_options_, std::move(map_builder));
@@ -650,7 +651,7 @@ TEST_P(ClientServerTestByGridType, LoadStateAndDelete) {
                                  kLandmarkDataProtoString,
                              });
 
-  auto trajectory_remapping = stub_->LoadState(reader.get(), true);
+  auto trajectory_remapping = stub_->LoadState(reader.get(), PoseGraphInterface::TrajectoryState::FROZEN);
   int expected_trajectory_id = 0;
   EXPECT_EQ(trajectory_remapping.size(), 1);
   EXPECT_EQ(trajectory_remapping.at(0), expected_trajectory_id);
@@ -690,7 +691,7 @@ TEST_P(ClientServerTestByGridType, LoadUnfrozenStateAndDelete) {
                              });
 
   auto trajectory_remapping =
-      stub_->LoadState(reader.get(), false /* load_frozen_state */);
+      stub_->LoadState(reader.get(), PoseGraphInterface::TrajectoryState::FROZEN /* load_frozen_state */);
   int expected_trajectory_id = 0;
   EXPECT_EQ(trajectory_remapping.size(), 1);
   EXPECT_EQ(trajectory_remapping.at(0), expected_trajectory_id);

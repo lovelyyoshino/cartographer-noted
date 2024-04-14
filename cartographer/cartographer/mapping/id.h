@@ -54,69 +54,51 @@ common::Time GetTime(const T& t) {
 
 // Uniquely identifies a trajectory node using a combination of a unique
 // trajectory ID and a zero-based index of the node inside that trajectory.
-// -----------------------------------------------------------------------------
-// ------------------------------------struct NodeId-----------------------------------------
 struct NodeId {
   NodeId(int trajectory_id, int node_index)
       : trajectory_id(trajectory_id), node_index(node_index) {}
-/*
-每一个轨迹trajectory上有多个节点node。
-如何唯一的表达这些节点node？节点标号:轨迹id+{0,1,2,...}
-*/
-  int trajectory_id;   //轨迹的序号                                                      
-  int node_index;      //轨迹的内部节点id'
-// -----------------------------------------------------------------------------
-// ------------------------NodeId-----------重载运算符 == -----------------------------------------
+
+  int trajectory_id;
+  int node_index;
+
   bool operator==(const NodeId& other) const {
     return std::forward_as_tuple(trajectory_id, node_index) ==
            std::forward_as_tuple(other.trajectory_id, other.node_index);
   }
-// -----------------------------------------------------------------------------
-// ------------------------NodeId-----------重载运算符 != -----------------------------------------
+
   bool operator!=(const NodeId& other) const { return !operator==(other); }
-// -----------------------------------------------------------------------------
-// ------------------------NodeId-----------重载运算符 < -----------------------------------------
+
   bool operator<(const NodeId& other) const {
     return std::forward_as_tuple(trajectory_id, node_index) <
            std::forward_as_tuple(other.trajectory_id, other.node_index);
   }
-// -----------------------------------------------------------------------------
-// ------------------------NodeId-----------转proto -----------------------------------------
+
   void ToProto(proto::NodeId* proto) const {
     proto->set_trajectory_id(trajectory_id);
     proto->set_node_index(node_index);
   }
 };
-// -----------------------------------------------------------------------------
-// ------------------------NodeId-----------重载运算符 << -----------------------------------------
+
 inline std::ostream& operator<<(std::ostream& os, const NodeId& v) {
   return os << "(" << v.trajectory_id << ", " << v.node_index << ")";
 }
 
-
 // Uniquely identifies a submap using a combination of a unique trajectory ID
 // and a zero-based index of the submap inside that trajectory.
-// -----------------------------------------------------------------------------
-// ---------------------------ubmapId---------struct  SubmapId -----------------------------------------
 struct SubmapId {
   SubmapId(int trajectory_id, int submap_index)
-      : trajectory_id(trajectory_id), 
-        submap_index(submap_index) {}
+      : trajectory_id(trajectory_id), submap_index(submap_index) {}
 
   int trajectory_id;
   int submap_index;
-// -----------------------------------------------------------------------------
-// -------------------------ubmapId----------重载运算符 == -----------------------------------------
+
   bool operator==(const SubmapId& other) const {
-    return std::forward_as_tuple(trajectory_id, submap_index) ==              //tuple等价于一个结构体
-           std::forward_as_tuple(other.trajectory_id, other.submap_index);    //创建右值的引用元组方法：forward_as_tuple。
+    return std::forward_as_tuple(trajectory_id, submap_index) ==
+           std::forward_as_tuple(other.trajectory_id, other.submap_index);
   }
-// -----------------------------------------------------------------------------
-// --------------------------ubmapId---------重载运算符 != -----------------------------------------
+
   bool operator!=(const SubmapId& other) const { return !operator==(other); }
 
-// -----------------------------------------------------------------------------
-// -----------------------------------重载运算符 < -----------------------------------------
   bool operator<(const SubmapId& other) const {
     return std::forward_as_tuple(trajectory_id, submap_index) <
            std::forward_as_tuple(other.trajectory_id, other.submap_index);
@@ -127,19 +109,16 @@ struct SubmapId {
     proto->set_submap_index(submap_index);
   }
 };
-// -----------------------------------------------------------------------------
-// ---------------------------ubmapId--------重载运算符 << -----------------------------------------
+
 inline std::ostream& operator<<(std::ostream& os, const SubmapId& v) {
   return os << "(" << v.trajectory_id << ", " << v.submap_index << ")";
 }
-// ----------------------------------------------------------------------------------
-// ---------------------------------class Range-------------------------------------
+
 template <typename IteratorType>
 class Range {
  public:
   Range(const IteratorType& begin, const IteratorType& end)
-      : begin_(begin), 
-        end_(end) {}
+      : begin_(begin), end_(end) {}
 
   IteratorType begin() const { return begin_; }
   IteratorType end() const { return end_; }
@@ -153,22 +132,18 @@ class Range {
 // 'SubmapId'.
 // Note: This container will only ever contain non-empty trajectories. Trimming
 // the last remaining node of a trajectory drops the trajectory.
-// ----------------------------------------------------------------------------------
-// ---------------------------------class MapById-------------------------------------
-template <typename IdType, typename DataType>class MapById 
-{
+template <typename IdType, typename DataType>
+class MapById {
  private:
   struct MapByIndex;
 
  public:
-  struct IdDataReference 
-  {
+  struct IdDataReference {
     IdType id;
     const DataType& data;
   };
 
-  class ConstIterator 
-  {
+  class ConstIterator {
    public:
     using iterator_category = std::bidirectional_iterator_tag;
     using value_type = IdDataReference;
@@ -177,11 +152,10 @@ template <typename IdType, typename DataType>class MapById
     using reference = const IdDataReference&;
 
     explicit ConstIterator(const MapById& map_by_id, const int trajectory_id)
-        : current_trajectory_(map_by_id.trajectories_.lower_bound(trajectory_id)),
-          end_trajectory_(map_by_id.trajectories_.end()) 
-    {
-      if (current_trajectory_ != end_trajectory_) 
-      {
+        : current_trajectory_(
+              map_by_id.trajectories_.lower_bound(trajectory_id)),
+          end_trajectory_(map_by_id.trajectories_.end()) {
+      if (current_trajectory_ != end_trajectory_) {
         current_data_ = current_trajectory_->second.data_.begin();
         AdvanceToValidDataIterator();
       }
@@ -189,21 +163,16 @@ template <typename IdType, typename DataType>class MapById
 
     explicit ConstIterator(const MapById& map_by_id, const IdType& id)
         : current_trajectory_(map_by_id.trajectories_.find(id.trajectory_id)),
-          end_trajectory_(map_by_id.trajectories_.end()) 
-    {
-      if (current_trajectory_ != end_trajectory_) 
-      {
+          end_trajectory_(map_by_id.trajectories_.end()) {
+      if (current_trajectory_ != end_trajectory_) {
         current_data_ =
             current_trajectory_->second.data_.find(MapById::GetIndex(id));
-        if (current_data_ == current_trajectory_->second.data_.end()) 
-        {
+        if (current_data_ == current_trajectory_->second.data_.end()) {
           current_trajectory_ = end_trajectory_;
         }
       }
     }
-// －－－－－－－－－－－－－－－－－－－－－－－ ConstIterator－－－－－－－－－－－－－－－－－－－－－－
 
-// －－－－－－－－－－－－－－－－－－－－－－－重载运算符－－－－－－－－－－－－－－－－－－－－－－
     IdDataReference operator*() const {
       CHECK(current_trajectory_ != end_trajectory_);
       return IdDataReference{
@@ -242,9 +211,7 @@ template <typename IdType, typename DataType>class MapById
     }
 
     bool operator!=(const ConstIterator& it) const { return !operator==(it); }
-// －－－－－－－－－－－－－－－－－－－－－－－重载运算符－－－－－－－－－－－－－－－－－－－－－－
 
-// －－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－
    private:
     void AdvanceToValidDataIterator() {
       CHECK(current_trajectory_ != end_trajectory_);
@@ -274,7 +241,6 @@ template <typename IdType, typename DataType>class MapById
         typename std::map<int, MapByIndex>::const_iterator current_trajectory)
         : current_trajectory_(current_trajectory) {}
 
-// －－－－－－－－－－－－－－－－－－－－－－－重载运算符－－－－－－－－－－－－－－－－－－－－－－
     int operator*() const { return current_trajectory_->first; }
 
     ConstTrajectoryIterator& operator++() {
@@ -294,7 +260,7 @@ template <typename IdType, typename DataType>class MapById
     bool operator!=(const ConstTrajectoryIterator& it) const {
       return !operator==(it);
     }
-// －－－－－－－－－－－－－－－－－－－－－－－重载运算符－－－－－－－－－－－－－－－－－－－－－－
+
    private:
     typename std::map<int, MapByIndex>::const_iterator current_trajectory_;
   };
@@ -303,10 +269,11 @@ template <typename IdType, typename DataType>class MapById
   IdType Append(const int trajectory_id, const DataType& data) {
     CHECK_GE(trajectory_id, 0);
     auto& trajectory = trajectories_[trajectory_id];
+
     CHECK(trajectory.can_append_);
     const int index =
         trajectory.data_.empty() ? 0 : trajectory.data_.rbegin()->first + 1;
-    trajectory.data_.emplace(index, data);//放置
+    trajectory.data_.emplace(index, data);
     return IdType{trajectory_id, index};
   }
 
@@ -320,10 +287,10 @@ template <typename IdType, typename DataType>class MapById
   void Insert(const IdType& id, const DataType& data) {
     CHECK_GE(id.trajectory_id, 0);
     CHECK_GE(GetIndex(id), 0);
-    auto& trajectory = trajectories_[id.trajectory_id];　　　　　　　　　　　　　　//使用引用，trajectory.data_.emplace插入数据时，
-                                                                                //也是给trajectories_全局变量插入数据
-    trajectory.can_append_ = false;　　　　　　　　　　　　　　　　　　　　　
-    CHECK(trajectory.data_.emplace(GetIndex(id), data).second);
+    auto& trajectory = trajectories_[id.trajectory_id];
+    trajectory.can_append_ = false;
+    trajectory.data_.emplace(GetIndex(id), data);
+    //CHECK(trajectory.data_.emplace(GetIndex(id), data).second);
   }
 
   // Removes the data for 'id' which must exist.
@@ -336,6 +303,8 @@ template <typename IdType, typename DataType>class MapById
       // We assume that we will never append to it anymore. If we did, we would
       // have to make sure that gaps in indices are properly chosen to maintain
       // correct connectivity.
+
+      //okagv ,okagv would append it, because only one map exist, so remove it 
       trajectory.can_append_ = false;
     }
     trajectory.data_.erase(it);

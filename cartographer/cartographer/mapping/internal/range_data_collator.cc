@@ -19,7 +19,7 @@
 #include <memory>
 
 #include "absl/memory/memory.h"
-#include "cartographer/mapping/internal/local_slam_result_data.h"
+#include "cartographer/mapping/local_slam_result_data.h"
 #include "glog/logging.h"
 
 namespace cartographer {
@@ -29,14 +29,12 @@ constexpr float RangeDataCollator::kDefaultIntensityValue;
 
 sensor::TimedPointCloudOriginData RangeDataCollator::AddRangeData(
     const std::string& sensor_id,
-    sensor::TimedPointCloudData timed_point_cloud_data) 
-{
+    sensor::TimedPointCloudData timed_point_cloud_data) {
   CHECK_NE(expected_sensor_ids_.count(sensor_id), 0);
   timed_point_cloud_data.intensities.resize(
       timed_point_cloud_data.ranges.size(), kDefaultIntensityValue);
   // TODO(gaschler): These two cases can probably be one.
-  if (id_to_pending_data_.count(sensor_id) != 0) 
-  {
+  if (id_to_pending_data_.count(sensor_id) != 0) {
     current_start_ = current_end_;
     // When we have two messages of the same sensor, move forward the older of
     // the two (do not send out current).
@@ -46,15 +44,13 @@ sensor::TimedPointCloudOriginData RangeDataCollator::AddRangeData(
     return result;
   }
   id_to_pending_data_.emplace(sensor_id, std::move(timed_point_cloud_data));
-  if (expected_sensor_ids_.size() != id_to_pending_data_.size()) 
-  {
+  if (expected_sensor_ids_.size() != id_to_pending_data_.size()) {
     return {};
   }
   current_start_ = current_end_;
   // We have messages from all sensors, move forward to oldest.
   common::Time oldest_timestamp = common::Time::max();
-  for (const auto& pair : id_to_pending_data_) 
-  {
+  for (const auto& pair : id_to_pending_data_) {
     oldest_timestamp = std::min(oldest_timestamp, pair.second.time);
   }
   current_end_ = oldest_timestamp;

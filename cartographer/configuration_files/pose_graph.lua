@@ -14,6 +14,7 @@
 
 POSE_GRAPH = {
   optimize_every_n_nodes = 90,
+  optimize_every_meter = 0.5, --okagv
   constraint_builder = {
     sampling_ratio = 0.3,
     max_constraint_distance = 15.,
@@ -22,6 +23,8 @@ POSE_GRAPH = {
     loop_closure_translation_weight = 1.1e4,
     loop_closure_rotation_weight = 1e5,
     log_matches = true,
+    max_match_variety_distance = 2.,
+
     fast_correlative_scan_matcher = {
       linear_search_window = 7.,
       angular_search_window = math.rad(30.),
@@ -29,6 +32,7 @@ POSE_GRAPH = {
     },
     ceres_scan_matcher = {
       occupied_space_weight = 20.,
+      intensity_space_weight = 1.,
       translation_weight = 10.,
       rotation_weight = 1.,
       ceres_solver_options = {
@@ -63,8 +67,8 @@ POSE_GRAPH = {
   matcher_rotation_weight = 1.6e3,
   optimization_problem = {
     huber_scale = 1e1,
-    acceleration_weight = 1.1e2,
-    rotation_weight = 1.6e4,
+    acceleration_weight = 1e3,
+    rotation_weight = 3e5,
     local_slam_pose_translation_weight = 1e5,
     local_slam_pose_rotation_weight = 1e5,
     odometry_translation_weight = 1e5,
@@ -87,9 +91,10 @@ POSE_GRAPH = {
   global_sampling_ratio = 0.003,
   log_residual_histograms = true,
   global_constraint_search_after_n_seconds = 10.,
-  --  overlapping_submaps_trimmer_2d = {
-  --    fresh_submaps_count = 1,
-  --    min_covered_area = 2,
-  --    min_added_submaps_count = 5,
-  --  },
+  local_constraint_search_after_n_seconds = 2.,
+    overlapping_submaps_trimmer_2d = {
+      fresh_submaps_count = 1,
+      min_covered_area = 2,
+      min_added_submaps_count = 5,
+    },
 }

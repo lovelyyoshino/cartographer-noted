@@ -94,7 +94,7 @@ class OptimizationProblem2D
     return landmark_data_;
   }
   const sensor::MapByTime<sensor::ImuData>& imu_data() const override {
-    return empty_imu_data_;
+    return imu_data_;
   }
   const sensor::MapByTime<sensor::OdometryData>& odometry_data()
       const override {
@@ -116,6 +116,11 @@ class OptimizationProblem2D
     return trajectory_data_;
   }
 
+  //okagv
+    const sensor::MapByTime<sensor::ImuData>& imu_data_after_update()  override {
+    return imu_data_;
+  }
+
  private:
   std::unique_ptr<transform::Rigid3d> InterpolateOdometry(
       int trajectory_id, common::Time time) const;
@@ -128,10 +133,11 @@ class OptimizationProblem2D
   MapById<NodeId, NodeSpec2D> node_data_;
   MapById<SubmapId, SubmapSpec2D> submap_data_;
   std::map<std::string, transform::Rigid3d> landmark_data_;
-  sensor::MapByTime<sensor::ImuData> empty_imu_data_;
+  sensor::MapByTime<sensor::ImuData> imu_data_;
   sensor::MapByTime<sensor::OdometryData> odometry_data_;
   sensor::MapByTime<sensor::FixedFramePoseData> fixed_frame_pose_data_;
   std::map<int, PoseGraphInterface::TrajectoryData> trajectory_data_;
+
 };
 
 }  // namespace optimization

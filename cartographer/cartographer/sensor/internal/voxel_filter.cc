@@ -17,10 +17,7 @@
 #include "cartographer/sensor/internal/voxel_filter.h"
 
 #include <cmath>
-#include <random>
-#include <utility>
 
-#include "absl/container/flat_hash_map.h"
 #include "cartographer/common/math.h"
 
 namespace cartographer {
@@ -30,9 +27,13 @@ namespace {
 
 PointCloud FilterByMaxRange(const PointCloud& point_cloud,
                             const float max_range) {
-  return point_cloud.copy_if([max_range](const RangefinderPoint& point) {
-    return point.position.norm() <= max_range;
-  });
+  PointCloud result;
+  for (const RangefinderPoint& point : point_cloud) {
+    if (point.position.norm() <= max_range) {
+      result.push_back(point);
+    }
+  }
+  return result;
 }
 
 PointCloud AdaptivelyVoxelFiltered(
@@ -42,7 +43,7 @@ PointCloud AdaptivelyVoxelFiltered(
     // 'point_cloud' is already sparse enough.
     return point_cloud;
   }
-  PointCloud result = VoxelFilter(point_cloud, options.max_length());
+  PointCloud result = VoxelFilter(options.max_length()).Filter(point_cloud);
   if (result.size() >= options.min_num_points()) {
     // Filtering with 'max_length' resulted in a sufficiently dense point cloud.
     return result;
@@ -53,14 +54,15 @@ PointCloud AdaptivelyVoxelFiltered(
   for (float high_length = options.max_length();
        high_length > 1e-2f * options.max_length(); high_length /= 2.f) {
     float low_length = high_length / 2.f;
-    result = VoxelFilter(point_cloud, low_length);
+    result = VoxelFilter(low_length).Filter(point_cloud);
     if (result.size() >= options.min_num_points()) {
       // Binary search to find the right amount of filtering. 'low_length' gave
       // a sufficiently dense 'result', 'high_length' did not. We stop when the
       // edge length is at most 10% off.
       while ((high_length - low_length) / low_length > 1e-1f) {
         const float mid_length = (low_length + high_length) / 2.f;
-        const PointCloud candidate = VoxelFilter(point_cloud, mid_length);
+        const PointCloud candidate =
+            VoxelFilter(mid_length).Filter(point_cloud);
         if (candidate.size() >= options.min_num_points()) {
           low_length = mid_length;
           result = candidate;
@@ -74,115 +76,58 @@ PointCloud AdaptivelyVoxelFiltered(
   return result;
 }
 
-using VoxelKeyType = uint64_t;
+}  // namespace
 
-VoxelKeyType GetVoxelCellIndex(const Eigen::Vector3f& point,
-                               const float resolution) {
-  const Eigen::Array3f index = point.array() / resolution;
-  const uint64_t x = common::RoundToInt(index.x());
-  const uint64_t y = common::RoundToInt(index.y());
-  const uint64_t z = common::RoundToInt(index.z());
-  return (x << 42) + (y << 21) + z;
-}
-
-template <class T, class PointFunction>
-std::vector<bool> RandomizedVoxelFilterIndices(
-    const std::vector<T>& point_cloud, const float resolution,
-    PointFunction&& point_function) {
-  // According to https://en.wikipedia.org/wiki/Reservoir_sampling
-  std::minstd_rand0 generator;
-  absl::flat_hash_map<VoxelKeyType, std::pair<int, int>>
-      voxel_count_and_point_index;
-  for (size_t i = 0; i < point_cloud.size(); i++) {
-    auto& voxel = voxel_count_and_point_index[GetVoxelCellIndex(
-        point_function(point_cloud[i]), resolution)];
-    voxel.first++;
-    if (voxel.first == 1) {
-      voxel.second = i;
-    } else {
-      std::uniform_int_distribution<> distribution(1, voxel.first);
-      if (distribution(generator) == voxel.first) {
-        voxel.second = i;
-      }
-    }
-  }
-  std::vector<bool> points_used(point_cloud.size(), false);
-  for (const auto& voxel_and_index : voxel_count_and_point_index) {
-    points_used[voxel_and_index.second.second] = true;
-  }
-  return points_used;
-}
-
-template <class T, class PointFunction>
-std::vector<T> RandomizedVoxelFilter(const std::vector<T>& point_cloud,
-                                     const float resolution,
-                                     PointFunction&& point_function)
-{
-  const std::vector<bool> points_used =
-      RandomizedVoxelFilterIndices(point_cloud, 
-                                   resolution, 
-                                   point_function);
-
-  std::vector<T> results;
-  for (size_t i = 0; i < point_cloud.size(); i++) 
-  {
-    if (points_used[i]) 
-    {
-      results.push_back(point_cloud[i]);
+PointCloud VoxelFilter::Filter(const PointCloud& point_cloud) {
+  PointCloud results;
+  for (const RangefinderPoint& point : point_cloud) {
+    auto it_inserted =
+        voxel_set_.insert(IndexToKey(GetCellIndex(point.position)));
+    if (it_inserted.second) {
+      results.push_back(point);
     }
   }
   return results;
 }
 
-}  // namespace
-
-std::vector<RangefinderPoint> VoxelFilter(
-    const std::vector<RangefinderPoint>& points, const float resolution) {
-  return RandomizedVoxelFilter(
-      points, 
-      resolution,
-      [](const RangefinderPoint& point) { return point.position; });
-}
-
-PointCloud VoxelFilter(const PointCloud& point_cloud, const float resolution) {
-  const std::vector<bool> points_used = RandomizedVoxelFilterIndices(
-      point_cloud.points(), resolution,
-      [](const RangefinderPoint& point) { return point.position; });
-
-  std::vector<RangefinderPoint> filtered_points;
-  for (size_t i = 0; i < point_cloud.size(); i++) {
-    if (points_used[i]) {
-      filtered_points.push_back(point_cloud[i]);
+TimedPointCloud VoxelFilter::Filter(const TimedPointCloud& timed_point_cloud) {
+  TimedPointCloud results;
+  for (const TimedRangefinderPoint& point : timed_point_cloud) {
+    auto it_inserted =
+        voxel_set_.insert(IndexToKey(GetCellIndex(point.position)));
+    if (it_inserted.second) {
+      results.push_back(point);
     }
   }
-  std::vector<float> filtered_intensities;
-  CHECK_LE(point_cloud.intensities().size(), point_cloud.points().size());
-  for (size_t i = 0; i < point_cloud.intensities().size(); i++) {
-    if (points_used[i]) {
-      filtered_intensities.push_back(point_cloud.intensities()[i]);
+  return results;
+}
+
+std::vector<TimedPointCloudOriginData::RangeMeasurement> VoxelFilter::Filter(
+    const std::vector<TimedPointCloudOriginData::RangeMeasurement>&
+        range_measurements) {
+  std::vector<TimedPointCloudOriginData::RangeMeasurement> results;
+  for (const auto& range_measurement : range_measurements) {
+    auto it_inserted = voxel_set_.insert(
+        IndexToKey(GetCellIndex(range_measurement.point_time.position)));
+    if (it_inserted.second) {
+      results.push_back(range_measurement);
     }
   }
-  return PointCloud(std::move(filtered_points),
-                    std::move(filtered_intensities));
+  return results;
 }
 
-TimedPointCloud VoxelFilter(const TimedPointCloud& timed_point_cloud,
-                            const float resolution) {
-  return RandomizedVoxelFilter(
-      timed_point_cloud, resolution,
-      [](const TimedRangefinderPoint& point) { return point.position; });
+VoxelFilter::KeyType VoxelFilter::IndexToKey(const Eigen::Array3i& index) {
+  KeyType k_0(static_cast<uint32>(index[0]));
+  KeyType k_1(static_cast<uint32>(index[1]));
+  KeyType k_2(static_cast<uint32>(index[2]));
+  return (k_0 << 2 * 32) | (k_1 << 1 * 32) | k_2;
 }
 
-std::vector<sensor::TimedPointCloudOriginData::RangeMeasurement> VoxelFilter(
-    const std::vector<sensor::TimedPointCloudOriginData::RangeMeasurement>&
-        range_measurements,
-    const float resolution) {
-  return RandomizedVoxelFilter(
-      range_measurements, resolution,
-      [](const sensor::TimedPointCloudOriginData::RangeMeasurement&
-             range_measurement) {
-        return range_measurement.point_time.position;
-      });
+Eigen::Array3i VoxelFilter::GetCellIndex(const Eigen::Vector3f& point) const {
+  Eigen::Array3f index = point.array() / resolution_;
+  return Eigen::Array3i(common::RoundToInt(index.x()),
+                        common::RoundToInt(index.y()),
+                        common::RoundToInt(index.z()));
 }
 
 proto::AdaptiveVoxelFilterOptions CreateAdaptiveVoxelFilterOptions(
@@ -195,11 +140,13 @@ proto::AdaptiveVoxelFilterOptions CreateAdaptiveVoxelFilterOptions(
   return options;
 }
 
-PointCloud AdaptiveVoxelFilter(
-    const PointCloud& point_cloud,
-    const proto::AdaptiveVoxelFilterOptions& options) {
+AdaptiveVoxelFilter::AdaptiveVoxelFilter(
+    const proto::AdaptiveVoxelFilterOptions& options)
+    : options_(options) {}
+
+PointCloud AdaptiveVoxelFilter::Filter(const PointCloud& point_cloud) const {
   return AdaptivelyVoxelFiltered(
-      options, FilterByMaxRange(point_cloud, options.max_range()));
+      options_, FilterByMaxRange(point_cloud, options_.max_range()));
 }
 
 }  // namespace sensor

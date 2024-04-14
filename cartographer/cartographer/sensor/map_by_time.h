@@ -94,6 +94,10 @@ class MapByTime {
     if (trajectory.empty()) {
       data_.erase(trajectory_id);
     }
+
+    //LOG(INFO) << "trajectory_id is " << trajectory_id;
+    //LOG(INFO) << "trajectory left size " << trajectory.size();
+    
   }
 
   bool HasTrajectory(const int trajectory_id) const {

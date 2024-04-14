@@ -25,7 +25,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "cartographer/common/time.h"
 #include "cartographer/io/color.h"
-#include "cartographer/sensor/rangefinder_point.h"
+#include "cartographer/sensor/point_cloud.h"
 
 namespace cartographer {
 namespace io {
@@ -53,13 +53,13 @@ struct PointsBatch {
   int trajectory_id;
 
   // Geometry of the points in the map frame.
-  std::vector<sensor::RangefinderPoint> points;
+  sensor::PointCloud points;
 
   // Intensities are optional and may be unspecified. The meaning of these
   // intensity values varies by device. For example, the VLP16 provides values
   // in the range [0, 100] for non-specular return values and values up to 255
   // for specular returns. On the other hand, Hokuyo lasers provide a 16-bit
-  // value that rarely peaks above 4096.
+  // value that rarely okagvs above 4096.
   std::vector<float> intensities;
 
   // Colors are optional. If set, they are RGB values.

@@ -24,6 +24,9 @@
 #include "cartographer/mapping/trajectory_builder_interface.h"
 #include "grpc++/grpc++.h"
 
+using TrajectoryType 
+      = cartographer::mapping::MapBuilderInterface::TrajectoryType;
+
 namespace cartographer {
 namespace cloud {
 
@@ -53,13 +56,43 @@ class MapBuilderStub : public mapping::MapBuilderInterface {
   bool SerializeStateToFile(bool include_unfinished_submaps,
                             const std::string& filename) override;
   std::map<int, int> LoadState(io::ProtoStreamReaderInterface* reader,
-                               bool load_frozen_state) override;
+                               const cartographer::mapping::PoseGraphInterface::TrajectoryState& state) override;
   std::map<int, int> LoadStateFromFile(const std::string& filename,
-                                       bool load_frozen_state) override;
+                                       const cartographer::mapping::PoseGraphInterface::TrajectoryState& state) override;
   int num_trajectory_builders() const override;
   mapping::PoseGraphInterface* pose_graph() override;
-  const std::vector<mapping::proto::TrajectoryBuilderOptionsWithSensorIds>&
+  const std::map<int, mapping::proto::TrajectoryBuilderOptionsWithSensorIds>&
   GetAllTrajectoryBuilderOptions() const override;
+
+    //okagv 
+  void SetTrajectoryTypeWithId(TrajectoryType type, int id) override;
+
+  //okagv
+  TrajectoryType GetTrajectoryTypeWithId(int id) override;
+
+  //okagv
+  TrajectoryType GetWorkingTrajectoryType() override;
+
+    //okagv
+  void DeleteTrajectory(int trajectory_id) override;
+
+    //okagv
+  bool SerializeStateToFileWithId(int trajectory_id,
+                            bool include_unfinished_submaps,
+                            const std::string &filename) override;
+
+  // okagv
+  bool SerializeStateToFileAfterUpdate(bool include_unfinished_submaps,
+                                       const std::string& filename) override;
+
+  int GetTrajectoryIdByName(std::string name) override;
+
+  //okagv
+  void RegisterClientIdForTrajectory(const std::string& client_id,
+                                                 int trajectory_id) override;
+
+  //okagv
+  void SetMapBuilderOptions(mapping::proto::MapBuilderOptions &option_reset) override;
 
  private:
   std::shared_ptr<::grpc::Channel> client_channel_;
@@ -67,6 +100,9 @@ class MapBuilderStub : public mapping::MapBuilderInterface {
   std::map<int, std::unique_ptr<mapping::TrajectoryBuilderInterface>>
       trajectory_builder_stubs_;
   const std::string client_id_;
+
+  TrajectoryType current_trajectory_type_;
+  int current_trajectory_id_;
 };
 
 }  // namespace cloud

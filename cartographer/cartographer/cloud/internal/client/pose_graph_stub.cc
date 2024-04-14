@@ -33,6 +33,12 @@
 #include "cartographer/transform/transform.h"
 #include "glog/logging.h"
 
+#include "cartographer/cloud/internal/handlers/okagv_get_order.h"
+#include "cartographer/cloud/internal/handlers/okagv_start_trajectory.h"
+#include "cartographer/cloud/internal/handlers/okagv_finish_trajectory.h"
+#include "cartographer/cloud/internal/handlers/okagv_wait_trajectory.h"
+#include "cartographer/cloud/internal/handlers/okagv_localize_trajectory.h"
+
 namespace cartographer {
 namespace cloud {
 
@@ -41,96 +47,210 @@ PoseGraphStub::PoseGraphStub(std::shared_ptr<::grpc::Channel> client_channel,
     : client_channel_(client_channel), client_id_(client_id) {}
 
 void PoseGraphStub::RunFinalOptimization() {
-  google::protobuf::Empty request;
-  async_grpc::Client<handlers::RunFinalOptimizationSignature> client(
-      client_channel_);
-  CHECK(client.Write(request));
+    google::protobuf::Empty request;
+    async_grpc::Client<handlers::RunFinalOptimizationSignature> client(
+                client_channel_);
+    CHECK(client.Write(request));
 }
 
 mapping::MapById<mapping::SubmapId, mapping::PoseGraphInterface::SubmapData>
 PoseGraphStub::GetAllSubmapData() const {
-  LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
 }
 
-mapping::PoseGraphInterface::SubmapData PoseGraphStub::GetSubmapData(
-    const mapping::SubmapId& submap_id) const {
-  LOG(FATAL) << "Not implemented";
+mapping::MapById<mapping::SubmapId, mapping::PoseGraphInterface::SubmapData>
+PoseGraphStub::GetAllSubmapDataAfterUpdate() const {
+    LOG(FATAL) << "Not implemented";
 }
 
 mapping::MapById<mapping::SubmapId, mapping::PoseGraphInterface::SubmapPose>
 PoseGraphStub::GetAllSubmapPoses() const {
-  google::protobuf::Empty request;
-  async_grpc::Client<handlers::GetAllSubmapPosesSignature> client(
-      client_channel_);
-  CHECK(client.Write(request));
-  mapping::MapById<mapping::SubmapId, mapping::PoseGraphInterface::SubmapPose>
-      submap_poses;
-  for (const auto& submap_pose : client.response().submap_poses()) {
-    submap_poses.Insert(
-        mapping::SubmapId{submap_pose.submap_id().trajectory_id(),
-                          submap_pose.submap_id().submap_index()},
-        mapping::PoseGraphInterface::SubmapPose{
-            submap_pose.submap_version(),
-            transform::ToRigid3(submap_pose.global_pose())});
-  }
-  return submap_poses;
+    google::protobuf::Empty request;
+    async_grpc::Client<handlers::GetAllSubmapPosesSignature> client(
+                client_channel_);
+    CHECK(client.Write(request));
+    mapping::MapById<mapping::SubmapId, mapping::PoseGraphInterface::SubmapPose>
+            submap_poses;
+    for (const auto& submap_pose : client.response().submap_poses()) {
+        submap_poses.Insert(
+                    mapping::SubmapId{submap_pose.submap_id().trajectory_id(),
+                                      submap_pose.submap_id().submap_index()},
+                    mapping::PoseGraphInterface::SubmapPose{
+                        submap_pose.submap_version(),
+                        transform::ToRigid3(submap_pose.global_pose())});
+    }
+    return submap_poses;
 }
 
 transform::Rigid3d PoseGraphStub::GetLocalToGlobalTransform(
-    int trajectory_id) const {
-  proto::GetLocalToGlobalTransformRequest request;
-  request.set_trajectory_id(trajectory_id);
-  async_grpc::Client<handlers::GetLocalToGlobalTransformSignature> client(
-      client_channel_);
-  CHECK(client.Write(request));
-  return transform::ToRigid3(client.response().local_to_global());
+        int trajectory_id) const {
+    proto::GetLocalToGlobalTransformRequest request;
+    request.set_trajectory_id(trajectory_id);
+    async_grpc::Client<handlers::GetLocalToGlobalTransformSignature> client(
+                client_channel_);
+    CHECK(client.Write(request));
+    return transform::ToRigid3(client.response().local_to_global());
 }
 
 mapping::MapById<mapping::NodeId, mapping::TrajectoryNode>
 PoseGraphStub::GetTrajectoryNodes() const {
-  LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
+}
+
+mapping::MapById<mapping::NodeId, mapping::TrajectoryNode>
+PoseGraphStub::GetTrajectoryNodesAfterUpdate() const {
+    LOG(FATAL) << "Not implemented";
 }
 
 mapping::MapById<mapping::NodeId, mapping::TrajectoryNodePose>
 PoseGraphStub::GetTrajectoryNodePoses() const {
-  google::protobuf::Empty request;
-  async_grpc::Client<handlers::GetTrajectoryNodePosesSignature> client(
-      client_channel_);
-  CHECK(client.Write(request));
-  mapping::MapById<mapping::NodeId, mapping::TrajectoryNodePose> node_poses;
-  for (const auto& node_pose : client.response().node_poses()) {
-    absl::optional<mapping::TrajectoryNodePose::ConstantPoseData>
-        constant_pose_data;
-    if (node_pose.has_constant_pose_data()) {
-      constant_pose_data = mapping::TrajectoryNodePose::ConstantPoseData{
-          common::FromUniversal(node_pose.constant_pose_data().timestamp()),
-          transform::ToRigid3(node_pose.constant_pose_data().local_pose())};
+    google::protobuf::Empty request;
+    async_grpc::Client<handlers::GetTrajectoryNodePosesSignature> client(
+                client_channel_);
+    CHECK(client.Write(request));
+    mapping::MapById<mapping::NodeId, mapping::TrajectoryNodePose> node_poses;
+    for (const auto& node_pose : client.response().node_poses()) {
+        absl::optional<mapping::TrajectoryNodePose::ConstantPoseData>
+                constant_pose_data;
+        if (node_pose.has_constant_pose_data()) {
+            constant_pose_data = mapping::TrajectoryNodePose::ConstantPoseData{
+                    common::FromUniversal(node_pose.constant_pose_data().timestamp()),
+                    transform::ToRigid3(node_pose.constant_pose_data().local_pose())};
+        }
+        node_poses.Insert(
+                    mapping::NodeId{node_pose.node_id().trajectory_id(),
+                                    node_pose.node_id().node_index()},
+                    mapping::TrajectoryNodePose{
+                        transform::ToRigid3(node_pose.global_pose()), constant_pose_data});
     }
-    node_poses.Insert(
-        mapping::NodeId{node_pose.node_id().trajectory_id(),
-                        node_pose.node_id().node_index()},
-        mapping::TrajectoryNodePose{
-            transform::ToRigid3(node_pose.global_pose()), constant_pose_data});
-  }
-  return node_poses;
+    return node_poses;
 }
 
 std::map<int, mapping::PoseGraphInterface::TrajectoryState>
 PoseGraphStub::GetTrajectoryStates() const {
-  google::protobuf::Empty request;
-  async_grpc::Client<handlers::GetTrajectoryStatesSignature> client(
-      client_channel_);
-  CHECK(client.Write(request));
-  std::map<int, mapping::PoseGraphInterface::TrajectoryState>
-      trajectories_state;
-  for (const auto& entry : client.response().trajectories_state()) {
-    trajectories_state[entry.first] = FromProto(entry.second);
-  }
-  return trajectories_state;
+    google::protobuf::Empty request;
+    async_grpc::Client<handlers::GetTrajectoryStatesSignature> client(
+                client_channel_);
+    CHECK(client.Write(request));
+    std::map<int, mapping::PoseGraphInterface::TrajectoryState>
+            trajectories_state;
+    for (const auto& entry : client.response().trajectories_state()) {
+        trajectories_state[entry.first] = FromProto(entry.second);
+    }
+    return trajectories_state;
+}
+
+mapping::PoseGraphInterface::OKagvOrder
+PoseGraphStub::GetOKagv_Order() const{
+
+    google::protobuf::Empty request;
+    async_grpc::Client<handlers::OKagvGetOrderSignature> client(
+                client_channel_);
+    CHECK(client.Write(request));
+
+    int order = client.response().order_type();
+
+    switch(order)
+    {
+    case 0:
+        return  mapping::PoseGraphInterface::OKagvOrder::START;
+    case 1:
+        return  mapping::PoseGraphInterface::OKagvOrder::FINISH;
+    case 2:
+        return  mapping::PoseGraphInterface::OKagvOrder::WAIT;
+    case 3:
+        return  mapping::PoseGraphInterface::OKagvOrder::SAVE;
+    }
+
+    return mapping::PoseGraphInterface::OKagvOrder::WAIT;
+
+}
+
+void PoseGraphStub::SetOKagv_Order(const OKagvOrder& order)
+{
+    current_okagv_order_ = order;
+
+    if(OKagvOrder::START == order)
+    {
+        async_grpc::Client<handlers::OKagvStartTrajectorySignature> client(
+        client_channel_);
+        //google::protobuf::Empty request;
+        //CHECK(client.Write(request));
+    }
+    else if(OKagvOrder::FINISH == order)
+    {
+        async_grpc::Client<handlers::OKagvFinishTrajectorySignature> client(
+        client_channel_);
+        google::protobuf::Empty request;
+        CHECK(client.Write(request));
+    }
+    else if(OKagvOrder::SAVE == order)
+    {
+        /* code */
+    }
+    else if(OKagvOrder::WAIT == order)
+    {
+        async_grpc::Client<handlers::OKagvWaitTrajectorySignature> client(
+        client_channel_);
+        google::protobuf::Empty request;
+        CHECK(client.Write(request));
+    }
+    else if(OKagvOrder::LOCALIZE == order)
+    {
+        //async_grpc::Client<handlers::OKagvLocalizeTrajectorySignature> client(
+        //client_channel_);
+        //proto::OKagv_LocalizeTrajectoryRequest request;
+        //CHECK(client.Write(request));
+    }
+    
+    return;
+    
+}
+
+mapping::PoseGraphInterface::OKagvFeedback PoseGraphStub::GetOKagv_Feedback()
+    const {
+        
+    mapping::PoseGraphInterface::OKagvFeedback feedback;
+    feedback.code = 0;
+    feedback.message = "no use";
+    feedback.state =  mapping::PoseGraphInterface::OKagvState::PROCESSING;
+
+    return feedback;
+}
+void PoseGraphStub::SetOKagv_Feedback(const OKagvFeedback& feedback) { return; }
+
+bool PoseGraphStub::LocalizeOKagvPoses(const bool use_initial_pose,
+                          const int trajectory_id,
+                          const transform::Rigid3d initial_pose) {
+
+        async_grpc::Client<handlers::OKagvLocalizeTrajectorySignature> client(
+        client_channel_);
+        proto::OKagv_LocalizeTrajectoryRequest request;
+        request.set_use_initial_pose(use_initial_pose);
+        *request.mutable_initial_pose() = transform::ToProto(initial_pose);
+
+        CHECK(client.Write(request));
+        
+        return true;
 }
 
 std::map<std::string, transform::Rigid3d> PoseGraphStub::GetLandmarkPoses()
-    const {
+const {
+    google::protobuf::Empty request;
+    async_grpc::Client<handlers::GetLandmarkPosesSignature> client(
+                client_channel_);
+    CHECK(client.Write(request));
+    std::map<std::string, transform::Rigid3d> landmark_poses;
+    for (const auto& landmark_pose : client.response().landmark_poses()) {
+        landmark_poses[landmark_pose.landmark_id()] =
+                transform::ToRigid3(landmark_pose.global_pose());
+    }
+    return landmark_poses;
+}
+
+// okagv
+std::map<std::string, transform::Rigid3d> PoseGraphStub::GetLandmarkPosesWithId(
+    int trajectory_id) const {
   google::protobuf::Empty request;
   async_grpc::Client<handlers::GetLandmarkPosesSignature> client(
       client_channel_);
@@ -143,64 +263,94 @@ std::map<std::string, transform::Rigid3d> PoseGraphStub::GetLandmarkPoses()
   return landmark_poses;
 }
 
+std::map<std::string, transform::Rigid3d> PoseGraphStub::GetLandmarkPosesAfterUpdate()
+const {
+    google::protobuf::Empty request;
+    async_grpc::Client<handlers::GetLandmarkPosesSignature> client(
+                client_channel_);
+    CHECK(client.Write(request));
+    std::map<std::string, transform::Rigid3d> landmark_poses;
+    for (const auto& landmark_pose : client.response().landmark_poses()) {
+        landmark_poses[landmark_pose.landmark_id()] =
+                transform::ToRigid3(landmark_pose.global_pose());
+    }
+    return landmark_poses;
+}
+
 void PoseGraphStub::SetLandmarkPose(const std::string& landmark_id,
                                     const transform::Rigid3d& global_pose,
                                     const bool frozen) {
-  proto::SetLandmarkPoseRequest request;
-  request.mutable_landmark_pose()->set_landmark_id(landmark_id);
-  *request.mutable_landmark_pose()->mutable_global_pose() =
-      transform::ToProto(global_pose);
-  async_grpc::Client<handlers::SetLandmarkPoseSignature> client(
-      client_channel_);
-  CHECK(client.Write(request));
+    proto::SetLandmarkPoseRequest request;
+    request.mutable_landmark_pose()->set_landmark_id(landmark_id);
+    *request.mutable_landmark_pose()->mutable_global_pose() =
+            transform::ToProto(global_pose);
+    async_grpc::Client<handlers::SetLandmarkPoseSignature> client(
+                client_channel_);
+    CHECK(client.Write(request));
 }
 
 void PoseGraphStub::DeleteTrajectory(int trajectory_id) {
-  proto::DeleteTrajectoryRequest request;
-  request.set_client_id(client_id_);
-  request.set_trajectory_id(trajectory_id);
-  async_grpc::Client<handlers::DeleteTrajectorySignature> client(
-      client_channel_);
-  ::grpc::Status status;
-  client.Write(request, &status);
-  if (!status.ok()) {
-    LOG(ERROR) << "Failed to delete trajectory " << trajectory_id
-               << " for client_id " << client_id_ << ": "
-               << status.error_message();
-  }
+    proto::DeleteTrajectoryRequest request;
+    request.set_client_id(client_id_);
+    request.set_trajectory_id(trajectory_id);
+    async_grpc::Client<handlers::DeleteTrajectorySignature> client(
+                client_channel_);
+    ::grpc::Status status;
+    client.Write(request, &status);
+    if (!status.ok()) {
+        LOG(ERROR) << "Failed to delete trajectory " << trajectory_id
+                   << " for client_id " << client_id_ << ": "
+                   << status.error_message();
+    }
 }
 
 bool PoseGraphStub::IsTrajectoryFinished(int trajectory_id) const {
-  proto::IsTrajectoryFinishedRequest request;
-  request.set_trajectory_id(trajectory_id);
-  async_grpc::Client<handlers::IsTrajectoryFinishedSignature> client(
-      client_channel_);
-  ::grpc::Status status;
-  CHECK(client.Write(request, &status))
-      << "Failed to check if trajectory " << trajectory_id
-      << " is finished: " << status.error_message();
-  return client.response().is_finished();
+    proto::IsTrajectoryFinishedRequest request;
+    request.set_trajectory_id(trajectory_id);
+    async_grpc::Client<handlers::IsTrajectoryFinishedSignature> client(
+                client_channel_);
+    ::grpc::Status status;
+    CHECK(client.Write(request, &status))
+            << "Failed to check if trajectory " << trajectory_id
+            << " is finished: " << status.error_message();
+    return client.response().is_finished();
 }
 
 bool PoseGraphStub::IsTrajectoryFrozen(int trajectory_id) const {
-  proto::IsTrajectoryFrozenRequest request;
-  request.set_trajectory_id(trajectory_id);
-  async_grpc::Client<handlers::IsTrajectoryFrozenSignature> client(
-      client_channel_);
-  ::grpc::Status status;
-  CHECK(client.Write(request, &status))
-      << "Failed to check if trajectory " << trajectory_id
-      << " is frozen: " << status.error_message();
-  return client.response().is_frozen();
+    proto::IsTrajectoryFrozenRequest request;
+    request.set_trajectory_id(trajectory_id);
+    async_grpc::Client<handlers::IsTrajectoryFrozenSignature> client(
+                client_channel_);
+    ::grpc::Status status;
+    CHECK(client.Write(request, &status))
+            << "Failed to check if trajectory " << trajectory_id
+            << " is frozen: " << status.error_message();
+    return client.response().is_frozen();
 }
 
 std::map<int, mapping::PoseGraphInterface::TrajectoryData>
 PoseGraphStub::GetTrajectoryData() const {
-  LOG(FATAL) << "Not implemented";
+    LOG(FATAL) << "Not implemented";
+}
+
+std::map<int, mapping::PoseGraphInterface::TrajectoryData>
+PoseGraphStub::GetTrajectoryDataAfterUpdate() const {
+    LOG(FATAL) << "Not implemented";
 }
 
 std::vector<mapping::PoseGraphInterface::Constraint>
 PoseGraphStub::constraints() const {
+    google::protobuf::Empty request;
+    async_grpc::Client<handlers::GetConstraintsSignature> client(client_channel_);
+    ::grpc::Status status;
+    CHECK(client.Write(request, &status))
+            << "Failed to get constraints: " << status.error_message();
+    return mapping::FromProto(client.response().constraints());
+}
+
+// okagv
+std::vector<mapping::PoseGraphInterface::Constraint>
+PoseGraphStub::constraintsWithId(int trajectory_id) const {
   google::protobuf::Empty request;
   async_grpc::Client<handlers::GetConstraintsSignature> client(client_channel_);
   ::grpc::Status status;
@@ -209,15 +359,85 @@ PoseGraphStub::constraints() const {
   return mapping::FromProto(client.response().constraints());
 }
 
+std::vector<mapping::PoseGraphInterface::Constraint>
+PoseGraphStub::constraintsAfterUpdate() const {
+    google::protobuf::Empty request;
+    async_grpc::Client<handlers::GetConstraintsSignature> client(client_channel_);
+    ::grpc::Status status;
+    CHECK(client.Write(request, &status))
+            << "Failed to get constraints: " << status.error_message();
+    return mapping::FromProto(client.response().constraints());
+}
+
 mapping::proto::PoseGraph PoseGraphStub::ToProto(
-    bool include_unfinished_submaps) const {
-  LOG(FATAL) << "Not implemented";
+        bool include_unfinished_submaps) const {
+    LOG(FATAL) << "Not implemented";
 }
 
 void PoseGraphStub::SetGlobalSlamOptimizationCallback(
-    GlobalSlamOptimizationCallback callback) {
-  LOG(FATAL) << "Not implemented";
+        GlobalSlamOptimizationCallback callback) {
+    LOG(FATAL) << "Not implemented";
 }
+
+// okagv
+bool PoseGraphStub::IsTrajectoryExist(int trajectory_id) const {
+  /*
+  absl::MutexLock locker(&mutex_);
+  auto it = data_.trajectories_state.find(trajectory_id);
+  if (it == data_.trajectories_state.end()) {
+    LOG(INFO) << "Find non-existing trajectory_id: "
+                 << trajectory_id;
+    return false;
+  }
+  else
+  {
+    return true;
+  }
+  */
+  return true;
+}
+
+void PoseGraphStub::GetCovarianceScore(double& score, bool& is_update) { return; }
+
+void PoseGraphStub::SetCovarianceScore(double score) { return; }
+
+void PoseGraphStub::SetTrajectoryState(int trajectoy_id,
+                                       TrajectoryState state) {
+  return;
+}
+
+void PoseGraphStub::SetWorkingTrajectoryType(uint8_t type) { return; }
+
+uint8_t PoseGraphStub::GetWorkingTrajectoryType() {return 0;}
+
+  void PoseGraphStub::SetConstraintBuilderMinScore(double score) {return;}
+
+  // okagv
+  mapping::proto::PoseGraph PoseGraphStub::ToProtoWithId(
+      int trajectory_id, bool include_unfinished_submaps) const {
+    LOG(FATAL) << "Not implemented";
+  }
+
+  // okagv
+  mapping::proto::PoseGraph PoseGraphStub::ToProtoWithUpdate(
+      bool include_unfinished_submaps) const {
+    LOG(FATAL) << "Not implemented";
+  }
+
+  // okagv
+  void PoseGraphStub::StopDrainWorkQueue() {}
+  // okagv
+  void PoseGraphStub::StartDrainWorkQueue() {}
+  // okagv
+  void PoseGraphStub::SetThreadPoolState(mapping::PoseGraphInterface::ThreadPoolState type) {}
+  // okagv
+  mapping::PoseGraphInterface::ThreadPoolState PoseGraphStub::GetThreadPoolState() {
+    return mapping::PoseGraphInterface::ThreadPoolState::IDLE;
+  }
+
+  // okagv
+  void PoseGraphStub::SetPoseGraphOption(
+      mapping::proto::PoseGraphOptions& option_reset) {return;}
 
 }  // namespace cloud
 }  // namespace cartographer

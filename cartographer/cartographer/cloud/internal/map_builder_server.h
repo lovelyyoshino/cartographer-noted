@@ -23,12 +23,13 @@
 #include "cartographer/cloud/internal/map_builder_context_interface.h"
 #include "cartographer/cloud/map_builder_server_interface.h"
 #include "cartographer/cloud/proto/map_builder_server_options.pb.h"
-#include "cartographer/common/internal/blocking_queue.h"
+#include "cartographer/common/blocking_queue.h"
 #include "cartographer/common/time.h"
 #include "cartographer/mapping/2d/submap_2d.h"
 #include "cartographer/mapping/3d/submap_3d.h"
-#include "cartographer/mapping/internal/local_slam_result_data.h"
 #include "cartographer/mapping/internal/submap_controller.h"
+#include "cartographer/mapping/local_slam_result_data.h"
+#include "cartographer/mapping/map_builder.h"
 #include "cartographer/mapping/trajectory_builder_interface.h"
 #include "cartographer/metrics/family_factory.h"
 #include "cartographer/sensor/internal/dispatchable.h"
@@ -68,6 +69,10 @@ class MapBuilderContext : public MapBuilderContextInterface {
   bool CheckClientIdForTrajectory(const std::string& client_id,
                                   int trajectory_id) override;
 
+    //okagv
+  virtual std::string GetRootFileDirectory() override;
+    //okagv
+    virtual int GetTrajectoryIdByName(std::string name) override;
  private:
   MapBuilderServer* map_builder_server_;
   mapping::SubmapController<SubmapType> submap_controller_;
@@ -81,7 +86,7 @@ class MapBuilderServer : public MapBuilderServerInterface {
 
   MapBuilderServer(
       const proto::MapBuilderServerOptions& map_builder_server_options,
-      std::unique_ptr<mapping::MapBuilderInterface> map_builder);
+      std::shared_ptr<mapping::MapBuilderInterface> map_builder);
   ~MapBuilderServer() {}
 
   // Starts the gRPC server, the 'LocalTrajectoryUploader' and the SLAM thread.
@@ -100,6 +105,9 @@ class MapBuilderServer : public MapBuilderServerInterface {
   void Shutdown() final;
 
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
+  
+  //okagv
+  std::string root_file_directory; 
 
  private:
   using LocalSlamResultHandlerSubscriptions =
@@ -131,7 +139,7 @@ class MapBuilderServer : public MapBuilderServerInterface {
   bool shutting_down_ = false;
   std::unique_ptr<std::thread> slam_thread_;
   std::unique_ptr<async_grpc::Server> grpc_server_;
-  std::unique_ptr<mapping::MapBuilderInterface> map_builder_;
+  std::shared_ptr<mapping::MapBuilderInterface> map_builder_;
   common::BlockingQueue<std::unique_ptr<MapBuilderContextInterface::Data>>
       incoming_data_queue_;
   absl::Mutex subscriptions_lock_;

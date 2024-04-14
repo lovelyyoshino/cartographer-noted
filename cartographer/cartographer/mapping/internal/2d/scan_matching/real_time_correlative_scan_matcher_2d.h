@@ -78,7 +78,6 @@ class RealTimeCorrelativeScanMatcher2D {
                        std::vector<Candidate2D>* candidates) const;
 
  private:
- // 根据预设的窗口大小，生成Candidate2D数据
   std::vector<Candidate2D> GenerateExhaustiveSearchCandidates(
       const SearchParameters& search_parameters) const;
 

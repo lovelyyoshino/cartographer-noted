@@ -37,13 +37,10 @@ namespace mapping {
 
 // Defines the limits of a grid map. This class must remain inlined for
 // performance reasons.
-//定义栅格地图的界限。该类必须保持内联
-//性能原因。
 class MapLimits {
  public:
-  MapLimits(const double resolution,                                            //分别获取分辨率 
-            const Eigen::Vector2d& max,                                           // 最大范围值 
-            const CellLimits& cell_limits)                                           // pixel坐标的最大范围
+  MapLimits(const double resolution, const Eigen::Vector2d& max,
+            const CellLimits& cell_limits)
       : resolution_(resolution), max_(max), cell_limits_(cell_limits) {
     CHECK_GT(resolution_, 0.);
     CHECK_GT(cell_limits.num_x_cells, 0.);
@@ -69,9 +66,7 @@ class MapLimits {
   // Returns the index of the cell containing the 'point' which may be outside
   // the map, i.e., negative or too large indices that will return false for
   // Contains().
-
-  
-  Eigen::Array2i GetCellIndex(const Eigen::Vector2f& point) const {            // 给出一个point在Submap中的坐标，求其栅格坐标
+  Eigen::Array2i GetCellIndex(const Eigen::Vector2f& point) const {
     // Index values are row major and the top left has Eigen::Array2i::Zero()
     // and contains (centered_max_x, centered_max_y). We need to flip and
     // rotate.
@@ -87,7 +82,6 @@ class MapLimits {
   }
 
   // Returns true if the ProbabilityGrid contains 'cell_index'.
-  // 返回布尔型，判断所给pixel坐标是否大于0，小于等于最大值
   bool Contains(const Eigen::Array2i& cell_index) const {
     return (Eigen::Array2i(0, 0) <= cell_index).all() &&
            (cell_index <

@@ -109,8 +109,18 @@ proto::PoseGraphOptions CreatePoseGraphOptions(
       parameter_dictionary->GetBool("log_residual_histograms"));
   options.set_global_constraint_search_after_n_seconds(
       parameter_dictionary->GetDouble(
-          "global_constraint_search_after_n_seconds"));
+          "global_constraint_search_after_n_seconds"));        
+  //okagv
+  options.set_optimize_every_meter(
+     parameter_dictionary->GetInt("optimize_every_meter"));
+
+  //okagv
+    options.set_local_constraint_search_after_n_seconds(
+      parameter_dictionary->GetDouble(
+          "local_constraint_search_after_n_seconds"));   
+
   PopulateOverlappingSubmapsTrimmerOptions2D(&options, parameter_dictionary);
+
   return options;
 }
 
@@ -129,6 +139,7 @@ proto::PoseGraph::Constraint ToProto(const PoseGraph::Constraint& constraint) {
   constraint_proto.mutable_node_id()->set_node_index(
       constraint.node_id.node_index);
   constraint_proto.set_tag(mapping::ToProto(constraint.tag));
+  //LOG(INFO) << "okagv ToProto " << constraint.node_id;
   return constraint_proto;
 }
 
@@ -208,6 +219,175 @@ proto::PoseGraph PoseGraph::ToProto(bool include_unfinished_submaps) const {
   }
   return proto;
 }
+
+  //okagv
+  proto::PoseGraph PoseGraph::ToProtoWithId(int trajectory_id, bool include_unfinished_submaps) const {
+      proto::PoseGraph proto;
+
+  //write one function
+  std::map<int, proto::Trajectory* const> trajectory_protos;
+  const auto trajectory = [&proto, &trajectory_protos](
+                              const int param_trajectory_id) -> proto::Trajectory* {
+    if (trajectory_protos.count(param_trajectory_id) == 0) {
+      auto* const trajectory_proto = proto.add_trajectory();
+      trajectory_proto->set_trajectory_id(param_trajectory_id);
+      CHECK(trajectory_protos.emplace(param_trajectory_id, trajectory_proto).second);
+    }
+    return trajectory_protos.at(param_trajectory_id);
+  };
+
+  std::set<mapping::SubmapId> unfinished_submaps;
+  for (const auto& submap_id_data : GetAllSubmapData()) {
+    // okagv
+    if (submap_id_data.id.trajectory_id != trajectory_id) continue;
+
+    proto::Trajectory* trajectory_proto =
+        trajectory(submap_id_data.id.trajectory_id);
+    if (!include_unfinished_submaps &&
+        !submap_id_data.data.submap->insertion_finished()) {
+      // Collect IDs of all unfinished submaps and skip them.
+      unfinished_submaps.insert(submap_id_data.id);
+      continue;
+    }
+    CHECK(submap_id_data.data.submap != nullptr);
+    auto* const submap_proto = trajectory_proto->add_submap();
+    submap_proto->set_submap_index(submap_id_data.id.submap_index);
+    *submap_proto->mutable_pose() =
+        transform::ToProto(submap_id_data.data.pose);
+  }
+
+  auto constraints_copy = constraintsWithId(trajectory_id);
+  std::set<mapping::NodeId> orphaned_nodes;
+  proto.mutable_constraint()->Reserve(constraints_copy.size());
+  for (auto it = constraints_copy.begin(); it != constraints_copy.end();) {
+    if (!include_unfinished_submaps &&
+        unfinished_submaps.count(it->submap_id) > 0) {
+      // Skip all those constraints that refer to unfinished submaps and
+      // remember the corresponding trajectory nodes as potentially orphaned.
+      orphaned_nodes.insert(it->node_id);
+      it = constraints_copy.erase(it);
+      continue;
+    }
+    *proto.add_constraint() = cartographer::mapping::ToProto(*it);
+    ++it;
+  }
+
+  if (!include_unfinished_submaps) {
+    // Iterate over all constraints and remove trajectory nodes from
+    // 'orphaned_nodes' that are not actually orphaned.
+    for (const auto& constraint : constraints_copy) {
+      orphaned_nodes.erase(constraint.node_id);
+    }
+  }
+
+  for (const auto& node_id_data : GetTrajectoryNodes()) {
+  
+    //okagv
+    if(node_id_data.id.trajectory_id != trajectory_id) continue;
+
+    proto::Trajectory* trajectory_proto =
+        trajectory(node_id_data.id.trajectory_id);
+    CHECK(node_id_data.data.constant_data != nullptr);
+    auto* const node_proto = trajectory_proto->add_node();
+    node_proto->set_node_index(node_id_data.id.node_index);
+    node_proto->set_timestamp(
+        common::ToUniversal(node_id_data.data.constant_data->time));
+    *node_proto->mutable_pose() =
+        transform::ToProto(node_id_data.data.global_pose);
+  }
+
+  auto landmarks_copy = GetLandmarkPosesWithId(trajectory_id);
+  proto.mutable_landmark_poses()->Reserve(landmarks_copy.size());
+  for (const auto& id_pose : landmarks_copy) {
+    auto* landmark_proto = proto.add_landmark_poses();
+    landmark_proto->set_landmark_id(id_pose.first);
+    *landmark_proto->mutable_global_pose() = transform::ToProto(id_pose.second);
+  }
+  return proto;
+  }
+
+  proto::PoseGraph PoseGraph::ToProtoWithUpdate(
+      bool include_unfinished_submaps) const {
+    proto::PoseGraph proto;
+
+    std::map<int, proto::Trajectory* const> trajectory_protos;
+    const auto trajectory = [&proto, &trajectory_protos](
+                                const int trajectory_id) -> proto::Trajectory* {
+      if (trajectory_protos.count(trajectory_id) == 0) {
+        auto* const trajectory_proto = proto.add_trajectory();
+        trajectory_proto->set_trajectory_id(trajectory_id);
+        CHECK(
+            trajectory_protos.emplace(trajectory_id, trajectory_proto).second);
+      }
+      return trajectory_protos.at(trajectory_id);
+    };
+
+    std::set<mapping::SubmapId> unfinished_submaps;
+    for (const auto& submap_id_data : GetAllSubmapDataAfterUpdate()) {
+
+      //LOG(INFO) << "okagv WRITE trajectory_id " << submap_id_data.id.trajectory_id 
+      //          << " submap_id " << submap_id_data.id.submap_index;
+      proto::Trajectory* trajectory_proto =
+          trajectory(submap_id_data.id.trajectory_id);
+      if (!include_unfinished_submaps &&
+          !submap_id_data.data.submap->insertion_finished()) {
+        // Collect IDs of all unfinished submaps and skip them.
+        unfinished_submaps.insert(submap_id_data.id);
+        continue;
+      }
+      CHECK(submap_id_data.data.submap != nullptr);
+      auto* const submap_proto = trajectory_proto->add_submap();
+      submap_proto->set_submap_index(submap_id_data.id.submap_index);
+      *submap_proto->mutable_pose() =
+          transform::ToProto(submap_id_data.data.pose);
+    }
+
+    auto constraints_copy = constraintsAfterUpdate();
+    std::set<mapping::NodeId> orphaned_nodes;
+    proto.mutable_constraint()->Reserve(constraints_copy.size());
+    for (auto it = constraints_copy.begin(); it != constraints_copy.end();) {
+      if (!include_unfinished_submaps &&
+          unfinished_submaps.count(it->submap_id) > 0) {
+        // Skip all those constraints that refer to unfinished submaps and
+        // remember the corresponding trajectory nodes as potentially orphaned.
+        orphaned_nodes.insert(it->node_id);
+        it = constraints_copy.erase(it);
+        continue;
+      }
+      *proto.add_constraint() = cartographer::mapping::ToProto(*it);
+      ++it;
+    }
+
+    if (!include_unfinished_submaps) {
+      // Iterate over all constraints and remove trajectory nodes from
+      // 'orphaned_nodes' that are not actually orphaned.
+      for (const auto& constraint : constraints_copy) {
+        orphaned_nodes.erase(constraint.node_id);
+      }
+    }
+
+    for (const auto& node_id_data : GetTrajectoryNodesAfterUpdate()) {
+      proto::Trajectory* trajectory_proto =
+          trajectory(node_id_data.id.trajectory_id);
+      CHECK(node_id_data.data.constant_data != nullptr);
+      auto* const node_proto = trajectory_proto->add_node();
+      node_proto->set_node_index(node_id_data.id.node_index);
+      node_proto->set_timestamp(
+          common::ToUniversal(node_id_data.data.constant_data->time));
+      *node_proto->mutable_pose() =
+          transform::ToProto(node_id_data.data.global_pose);
+    }
+
+    auto landmarks_copy = GetLandmarkPosesAfterUpdate();
+    proto.mutable_landmark_poses()->Reserve(landmarks_copy.size());
+    for (const auto& id_pose : landmarks_copy) {
+      auto* landmark_proto = proto.add_landmark_poses();
+      landmark_proto->set_landmark_id(id_pose.first);
+      *landmark_proto->mutable_global_pose() =
+          transform::ToProto(id_pose.second);
+    }
+    return proto;
+  }
 
 }  // namespace mapping
 }  // namespace cartographer

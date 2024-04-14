@@ -102,6 +102,17 @@ class FakeTrimmable : public Trimmable {
 
   std::vector<SubmapId> trimmed_submaps() { return trimmed_submaps_; }
 
+
+  //okagv
+  std::vector<NodeId> GetNodeIds(int trajectory_id) const override {
+   
+     std::vector<NodeId> node_ids;
+     return node_ids;
+  }
+
+  //okagv
+  void TrimNode(const NodeId& node_id) override {};
+
  private:
   std::vector<SubmapId> trimmed_submaps_;
 

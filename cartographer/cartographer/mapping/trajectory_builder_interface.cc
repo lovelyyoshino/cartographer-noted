@@ -18,7 +18,7 @@
 
 #include "cartographer/mapping/internal/2d/local_trajectory_builder_options_2d.h"
 #include "cartographer/mapping/internal/3d/local_trajectory_builder_options_3d.h"
-#include "cartographer/mapping/internal/local_slam_result_data.h"
+#include "cartographer/mapping/local_slam_result_data.h"
 
 namespace cartographer {
 namespace mapping {
@@ -37,23 +37,6 @@ void PopulatePureLocalizationTrimmerOptions(
       options_dictionary->GetInt("max_submaps_to_keep"));
 }
 
-void PopulatePoseGraphOdometryMotionFilterOptions(
-    proto::TrajectoryBuilderOptions* const trajectory_builder_options,
-    common::LuaParameterDictionary* const parameter_dictionary) {
-  constexpr char kDictionaryKey[] = "pose_graph_odometry_motion_filter";
-  if (!parameter_dictionary->HasKey(kDictionaryKey)) return;
-
-  auto options_dictionary = parameter_dictionary->GetDictionary(kDictionaryKey);
-  auto* options =
-      trajectory_builder_options->mutable_pose_graph_odometry_motion_filter();
-  options->set_max_time_seconds(
-      options_dictionary->GetDouble("max_time_seconds"));
-  options->set_max_distance_meters(
-      options_dictionary->GetDouble("max_distance_meters"));
-  options->set_max_angle_radians(
-      options_dictionary->GetDouble("max_angle_radians"));
-}
-
 }  // namespace
 
 proto::TrajectoryBuilderOptions CreateTrajectoryBuilderOptions(
@@ -70,7 +53,6 @@ proto::TrajectoryBuilderOptions CreateTrajectoryBuilderOptions(
   options.set_collate_landmarks(
       parameter_dictionary->GetBool("collate_landmarks"));
   PopulatePureLocalizationTrimmerOptions(&options, parameter_dictionary);
-  PopulatePoseGraphOdometryMotionFilterOptions(&options, parameter_dictionary);
   return options;
 }
 

@@ -18,7 +18,7 @@
 
 #include "cartographer/cloud/internal/sensor/serialization.h"
 #include "cartographer/cloud/proto/map_builder_service.pb.h"
-#include "cartographer/mapping/internal/local_slam_result_data.h"
+#include "cartographer/mapping/local_slam_result_data.h"
 #include "cartographer/transform/transform.h"
 #include "glog/logging.h"
 
@@ -86,6 +86,7 @@ void TrajectoryBuilderStub::AddSensorData(
                                   sensor::ToProto(timed_point_cloud_data),
                                   &request);
   add_rangefinder_client_->Write(request);
+
 }
 
 void TrajectoryBuilderStub::AddSensorData(const std::string& sensor_id,
@@ -113,7 +114,7 @@ void TrajectoryBuilderStub::AddSensorData(
                                sensor::ToProto(odometry_data), &request);
   add_odometry_client_->Write(request);
 }
-// GPS
+
 void TrajectoryBuilderStub::AddSensorData(
     const std::string& sensor_id,
     const sensor::FixedFramePoseData& fixed_frame_pose) {

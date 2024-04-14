@@ -52,15 +52,12 @@ std::unique_ptr<std::vector<float>> PrecomputeValueToBoundedFloat(
 }  // namespace
 
 const std::vector<float>* ValueConversionTables::GetConversionTable(
-    float unknown_result, 
-    float lower_bound, 
-    float upper_bound) 
-{
+    float unknown_result, float lower_bound, float upper_bound) {
   std::tuple<float, float, float> bounds =
       std::make_tuple(unknown_result, lower_bound, upper_bound);
   auto lookup_table_iterator = bounds_to_lookup_table_.find(bounds);
   if (lookup_table_iterator == bounds_to_lookup_table_.end()) {
-    auto insertion_result = bounds_to_olokup_table_.emplace(
+    auto insertion_result = bounds_to_lookup_table_.emplace(
         bounds, PrecomputeValueToBoundedFloat(0, unknown_result, lower_bound,
                                               upper_bound));
     return insertion_result.first->second.get();

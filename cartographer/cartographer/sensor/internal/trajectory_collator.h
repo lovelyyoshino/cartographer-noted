@@ -57,6 +57,9 @@ class TrajectoryCollator : public CollatorInterface {
 
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
 
+  //okagv
+  void DeleteTrajectory(int trajectory_id) override;
+
  private:
   metrics::Counter* GetOrCreateSensorMetric(const std::string& sensor_id,
                                             int trajectory_id);

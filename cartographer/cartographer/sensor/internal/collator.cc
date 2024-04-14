@@ -51,5 +51,14 @@ absl::optional<int> Collator::GetBlockingTrajectoryId() const {
   return absl::optional<int>(queue_.GetBlocker().trajectory_id);
 }
 
+void Collator::DeleteTrajectory(int trajectory_id){
+
+    //for (auto& queue_key : queue_keys_[trajectory_id]) {
+    //queue_.DeleteQueue(queue_key);
+  //}
+
+  queue_keys_.erase(trajectory_id);
+}
+
 }  // namespace sensor
 }  // namespace cartographer

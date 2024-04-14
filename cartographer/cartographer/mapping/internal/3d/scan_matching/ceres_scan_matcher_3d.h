@@ -34,11 +34,8 @@ namespace scan_matching {
 proto::CeresScanMatcherOptions3D CreateCeresScanMatcherOptions3D(
     common::LuaParameterDictionary* parameter_dictionary);
 
-struct PointCloudAndHybridGridsPointers {
-  const sensor::PointCloud* point_cloud;
-  const HybridGrid* hybrid_grid;
-  const IntensityHybridGrid* intensity_hybrid_grid;  // optional
-};
+using PointCloudAndHybridGridPointers =
+    std::pair<const sensor::PointCloud*, const HybridGrid*>;
 
 // This scan matcher uses Ceres to align scans with an existing map.
 class CeresScanMatcher3D {
@@ -53,10 +50,10 @@ class CeresScanMatcher3D {
   // 'summary'.
   void Match(const Eigen::Vector3d& target_translation,
              const transform::Rigid3d& initial_pose_estimate,
-             const std::vector<PointCloudAndHybridGridsPointers>&
+             const std::vector<PointCloudAndHybridGridPointers>&
                  point_clouds_and_hybrid_grids,
              transform::Rigid3d* pose_estimate,
-             ceres::Solver::Summary* summary) const;
+             ceres::Solver::Summary* summary);
 
  private:
   const proto::CeresScanMatcherOptions3D options_;

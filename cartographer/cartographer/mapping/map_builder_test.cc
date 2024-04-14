@@ -64,7 +64,7 @@ class MapBuilderTestBase : public T {
   }
 
   void BuildMapBuilder() {
-    map_builder_ = CreateMapBuilder(map_builder_options_);
+    map_builder_ = absl::make_unique<MapBuilder>(map_builder_options_);
   }
 
   void SetOptionsTo3D() {
@@ -376,7 +376,7 @@ TEST_P(MapBuilderTestByGridTypeAndDimensions, SaveLoadState) {
   BuildMapBuilder();
   io::ProtoStreamReader reader(filename);
   auto trajectory_remapping =
-      map_builder_->LoadState(&reader, false /* load_frozen_state */);
+      map_builder_->LoadState(&reader, cartographer::mapping::PoseGraphInterface::TrajectoryState::FROZEN /* load_frozen_state */);
   map_builder_->pose_graph()->RunFinalOptimization();
   EXPECT_EQ(num_constraints, map_builder_->pose_graph()->constraints().size());
   ASSERT_EQ(trajectory_remapping.size(), 1);
@@ -407,7 +407,7 @@ TEST_P(MapBuilderTestByGridType, LocalizationOnFrozenTrajectory2D) {
   SetOptionsEnableGlobalOptimization();
   BuildMapBuilder();
   io::ProtoStreamReader reader(filename);
-  map_builder_->LoadState(&reader, true /* load_frozen_state */);
+  map_builder_->LoadState(&reader, cartographer::mapping::PoseGraphInterface::TrajectoryState::FROZEN /* load_frozen_state */);
   map_builder_->pose_graph()->RunFinalOptimization();
   int trajectory_id = map_builder_->AddTrajectoryBuilder(
       {kRangeSensorId}, trajectory_builder_options_,

@@ -75,6 +75,9 @@ class LocalTrajectoryBuilder3D {
 
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
 
+      //okagv
+  void ClearOldData();
+
  private:
   std::unique_ptr<MatchingResult> AddAccumulatedRangeData(
       common::Time time,

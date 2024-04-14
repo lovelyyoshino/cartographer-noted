@@ -19,7 +19,7 @@
 
 #include "async_grpc/execution_context.h"
 #include "cartographer/cloud/internal/local_trajectory_uploader.h"
-#include "cartographer/common/internal/blocking_queue.h"
+#include "cartographer/common/blocking_queue.h"
 #include "cartographer/mapping/map_builder_interface.h"
 #include "cartographer/mapping/pose_graph_interface.h"
 #include "cartographer/mapping/proto/serialization.pb.h"
@@ -96,6 +96,11 @@ class MapBuilderContextInterface : public async_grpc::ExecutionContext {
                                              int trajectory_id) = 0;
   virtual bool CheckClientIdForTrajectory(const std::string& client_id,
                                           int trajectory_id) = 0;
+
+  //okagv
+  virtual std::string GetRootFileDirectory() = 0;
+  //okagv
+  virtual int GetTrajectoryIdByName(std::string name) = 0;
 };
 
 }  // namespace cloud

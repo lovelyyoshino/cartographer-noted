@@ -154,7 +154,7 @@ LuaParameterDictionary::NonReferenceCounted(
 
 LuaParameterDictionary::LuaParameterDictionary(
     const std::string& code, std::unique_ptr<FileResolver> file_resolver)
-    : LuaParameterDictionary(code, ReferenceCount::YES,
+    : LuaParameterDictionary(code, ReferenceCount::NO, //okagv default is YES
                              std::move(file_resolver)) {}
 
 LuaParameterDictionary::LuaParameterDictionary(

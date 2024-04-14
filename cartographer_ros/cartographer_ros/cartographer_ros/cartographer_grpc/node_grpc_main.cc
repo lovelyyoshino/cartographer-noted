@@ -22,6 +22,11 @@
 #include "gflags/gflags.h"
 #include "tf2_ros/transform_listener.h"
 
+#include "cartographer/io/proto_stream.h"
+
+#include "cartographer/mapping/pose_graph_interface.h"
+
+
 DEFINE_bool(collect_metrics, false,
             "Activates the collection of runtime metrics. If activated, the "
             "metrics can be accessed via a ROS service.");
@@ -32,7 +37,7 @@ DEFINE_string(configuration_directory, "",
 DEFINE_string(configuration_basename, "",
               "Basename, i.e. not containing any directory prefix, of the "
               "configuration file.");
-DEFINE_string(server_address, "localhost:50051",
+DEFINE_string(server_address, "0.0.0.0:50051",
               "gRPC server address to stream the sensor data to.");
 DEFINE_bool(
     start_trajectory_with_default_topics, true,
@@ -47,7 +52,7 @@ DEFINE_string(load_state_filename, "",
               "to the gRPC server's file system.");
 DEFINE_bool(load_frozen_state, true,
             "Load the saved state as frozen (non-optimized) trajectories.");
-DEFINE_bool(upload_load_state_file, false,
+DEFINE_bool(upload_load_state_file, true, //default is false
             "Upload the .pbstream file from a local path to the (remote) gRPC "
             "server instead of loading it from the server file system.");
 DEFINE_string(client_id, "",
@@ -69,8 +74,9 @@ void Run() {
       FLAGS_server_address, FLAGS_client_id);
 
   if (!FLAGS_load_state_filename.empty() && !FLAGS_upload_load_state_file) {
-    map_builder->LoadStateFromFile(FLAGS_load_state_filename,
-                                   FLAGS_load_frozen_state);
+     map_builder->LoadStateFromFile(FLAGS_load_state_filename,
+                                   cartographer::mapping::PoseGraphInterface::TrajectoryState::FROZEN);
+
   }
 
   Node node(node_options, std::move(map_builder), &tf_buffer,
@@ -97,6 +103,7 @@ void Run() {
 
 }  // namespace
 }  // namespace cartographer_ros
+
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);

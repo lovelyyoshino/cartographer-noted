@@ -62,7 +62,7 @@ When running as an online node, Cartographer doesn't know when your bag (or sens
 
    # Ask Cartographer to serialize its current state.
    # (press tab to quickly expand the parameter syntax)
-   rosservice call /write_state "{filename: '${HOME}/Downloads/b3-2016-04-05-14-14-00.bag.pbstream', include_unfinished_submaps: "true"}"
+   rosservice call /write_state "{filename: '${HOME}/Downloads/b3-2016-04-05-14-14-00.bag.pbstream', include_unfinished_submaps: 'true'}"
 
 Once you've retrieved your ``.pbstream`` file, you can run the assets writer with the `sample pipeline`_ for the 3D backpack:
 
@@ -80,8 +80,8 @@ For the last example, if you specify ``points.ply`` in the pipeline configuratio
 Configuration
 -------------
 
-The assets writer is modeled as a pipeline of `PointsProcessor`_ steps.
-`PointsBatch`_ data flows through each processor and they all have the chance to modify the ``PointsBatch`` before passing it on.
+The assets writer is modeled as a pipeline of `PointsProcessor`_s.
+`PointsBatch`_\ s flow through each processor and they all have the chance to modify the ``PointsBatch`` before passing it on.
 
 .. _PointsProcessor: https://github.com/cartographer-project/cartographer/blob/30f7de1a325d6604c780f2f74d9a345ec369d12d/cartographer/io/points_processor.h
 .. _PointsBatch: https://github.com/cartographer-project/cartographer/blob/30f7de1a325d6604c780f2f74d9a345ec369d12d/cartographer/io/points_batch.h
@@ -105,7 +105,7 @@ The available ``PointsProcessor``\ s are all defined in the `cartographer/io`_ s
 * **voxel_filter_and_remove_moving_objects**: Voxel filters the data and only passes on points that we believe are on non-moving objects.
 * **write_pcd**: Streams a PCD file to disk. The header is written in 'Flush'.
 * **write_ply**: Streams a PLY file to disk. The header is written in 'Flush'.
-* **write_probability_grid**: Creates a probability grid with the specified 'resolution'. As all points are projected into the x-y plane the z component of the data is ignored. 'range_data_inserter' options are used to configure the range data ray tracing through the probability grid.
+* **write_probability_grid**: Creates a probability grid with the specified 'resolution'. As all points are projected into the x-y plane the z component of the data is ignored. 'range_data_inserter' options are used to cofnigure the range data ray tracing through the probability grid.
 * **write_xray_image**: Creates X-ray cuts through the points with pixels being 'voxel_size' big.
 * **write_xyz**: Writes ASCII xyz points.
 
@@ -126,7 +126,6 @@ An example of such a pipeline is in `assets_writer_backpack_2d.lua`_.
 .. _assets_writer_backpack_2d.lua: https://github.com/cartographer-project/cartographer_ros/blob/44459e18102305745c56f92549b87d8e91f434fe/cartographer_ros/configuration_files/assets_writer_backpack_2d.lua
 
 Once you have the ``.ply``, follow the README of `point_cloud_viewer`_ to generate an on-disk octree data structure which can be viewed by one of the viewers (SDL or web based) in the same repo.
-Note that color is required for ``point_cloud_viewer`` to function.
 
 .. _point_cloud_viewer: https://github.com/cartographer-project/point_cloud_viewer
 

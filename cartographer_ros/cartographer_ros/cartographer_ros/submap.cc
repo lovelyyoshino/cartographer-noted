@@ -28,6 +28,13 @@ namespace cartographer_ros {
 std::unique_ptr<::cartographer::io::SubmapTextures> FetchSubmapTextures(
     const ::cartographer::mapping::SubmapId& submap_id,
     ros::ServiceClient* client) {
+
+  /*    
+  if (submap_id.trajectory_id == 0) {
+    LOG(INFO) << "Peak.ding FetchSubmapTextures " << submap_id;
+  }
+  */
+
   ::cartographer_ros_msgs::SubmapQuery srv;
   srv.request.trajectory_id = submap_id.trajectory_id;
   srv.request.submap_index = submap_id.submap_index;

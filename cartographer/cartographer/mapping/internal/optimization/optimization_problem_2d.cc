@@ -24,7 +24,7 @@
 #include <string>
 #include <vector>
 
-#include "cartographer/common/internal/ceres_solver_options.h"
+#include "cartographer/common/ceres_solver_options.h"
 #include "cartographer/common/histogram.h"
 #include "cartographer/common/math.h"
 #include "cartographer/mapping/internal/optimization/ceres_pose.h"
@@ -39,6 +39,7 @@ namespace cartographer {
 namespace mapping {
 namespace optimization {
 namespace {
+
 
 using ::cartographer::mapping::optimization::CeresPose;
 using LandmarkNode = ::cartographer::mapping::PoseGraphInterface::LandmarkNode;
@@ -111,9 +112,30 @@ void AddLandmarkCostFunctions(
     const MapById<NodeId, NodeSpec2D>& node_data,
     MapById<NodeId, std::array<double, 3>>* C_nodes,
     std::map<std::string, CeresPose>* C_landmarks, ceres::Problem* problem,
-    double huber_scale) {
+    double huber_scale,
+    const std::map<int, PoseGraphInterface::TrajectoryState>&
+        trajectories_state) {
+
+  // okagv
+    std::set<int> idle_routes; //same as idle_trajectorys
+  for (const auto& it : trajectories_state) {
+    if(it.second == PoseGraphInterface::TrajectoryState::IDLE){
+      idle_routes.insert(it.first);
+    }
+  }
+
   for (const auto& landmark_node : landmark_nodes) {
+    // okagv
+    if (landmark_node.second.confidence_score < 0.6) {
+      continue;
+    }
+
     for (const auto& observation : landmark_node.second.landmark_observations) {
+          //okagv
+        const bool idle = 
+         idle_routes.count(observation.trajectory_id) != 0;
+         if(idle) continue;
+
       const std::string& landmark_id = landmark_node.first;
       const auto& begin_of_trajectory =
           node_data.BeginOfTrajectory(observation.trajectory_id);
@@ -132,6 +154,7 @@ void AddLandmarkCostFunctions(
       if (next == begin_of_trajectory) {
         next = std::next(next);
       }
+
       auto prev = std::prev(next);
       // Add parameter blocks for the landmark ID if they were not added before.
       std::array<double, 3>* prev_node_pose = &C_nodes->at(prev->id);
@@ -175,8 +198,7 @@ OptimizationProblem2D::~OptimizationProblem2D() {}
 
 void OptimizationProblem2D::AddImuData(const int trajectory_id,
                                        const sensor::ImuData& imu_data) {
-  // IMU data is not used in 2D optimization, so we ignore this part of the
-  // interface.
+  imu_data_.Append(trajectory_id, imu_data);
 }
 
 void OptimizationProblem2D::AddOdometryData(
@@ -208,7 +230,7 @@ void OptimizationProblem2D::InsertTrajectoryNode(const NodeId& node_id,
 }
 
 void OptimizationProblem2D::TrimTrajectoryNode(const NodeId& node_id) {
-  empty_imu_data_.Trim(node_data_, node_id);
+  imu_data_.Trim(node_data_, node_id);
   odometry_data_.Trim(node_data_, node_id);
   fixed_frame_pose_data_.Trim(node_data_, node_id);
   node_data_.Trim(node_id);
@@ -229,6 +251,7 @@ void OptimizationProblem2D::InsertSubmap(
 
 void OptimizationProblem2D::TrimSubmap(const SubmapId& submap_id) {
   submap_data_.Trim(submap_id);
+  //LOG(INFO) << " okagv OptimizationProblem2D submap_data_ size " << submap_data_.size();
 }
 
 void OptimizationProblem2D::SetMaxNumIterations(
@@ -242,15 +265,28 @@ void OptimizationProblem2D::Solve(
     const std::map<int, PoseGraphInterface::TrajectoryState>&
         trajectories_state,
     const std::map<std::string, LandmarkNode>& landmark_nodes) {
+      //LOG(INFO) << "okagv landmark_nodes size " << landmark_nodes.size(); 
+      for(const auto& landmark : landmark_nodes)
+      {
+        if(landmark.first == "landmark_1")
+        {
+             //LOG(INFO) << "okagv landmark_observations size " << landmark.second.landmark_observations.size();
+        }
+      }
+
   if (node_data_.empty()) {
     // Nothing to optimize.
     return;
   }
 
   std::set<int> frozen_trajectories;
+  std::set<int> idle_trajectories;
   for (const auto& it : trajectories_state) {
     if (it.second == PoseGraphInterface::TrajectoryState::FROZEN) {
       frozen_trajectories.insert(it.first);
+    }
+    else if(it.second == PoseGraphInterface::TrajectoryState::IDLE){
+      idle_trajectories.insert(it.first);
     }
   }
 
@@ -263,7 +299,13 @@ void OptimizationProblem2D::Solve(
   MapById<NodeId, std::array<double, 3>> C_nodes;
   std::map<std::string, CeresPose> C_landmarks;
   bool first_submap = true;
+
   for (const auto& submap_id_data : submap_data_) {
+    //okagv
+    const bool idle = 
+         idle_trajectories.count(submap_id_data.id.trajectory_id) != 0;
+    if(idle) continue;
+
     const bool frozen =
         frozen_trajectories.count(submap_id_data.id.trajectory_id) != 0;
     C_submaps.Insert(submap_id_data.id,
@@ -276,7 +318,13 @@ void OptimizationProblem2D::Solve(
       problem.SetParameterBlockConstant(C_submaps.at(submap_id_data.id).data());
     }
   }
+
   for (const auto& node_id_data : node_data_) {
+    //okagv
+    const bool idle = 
+         idle_trajectories.count(node_id_data.id.trajectory_id) != 0;
+    if(idle) continue;
+
     const bool frozen =
         frozen_trajectories.count(node_id_data.id.trajectory_id) != 0;
     C_nodes.Insert(node_id_data.id, FromPose(node_id_data.data.global_pose_2d));
@@ -287,6 +335,12 @@ void OptimizationProblem2D::Solve(
   }
   // Add cost functions for intra- and inter-submap constraints.
   for (const Constraint& constraint : constraints) {
+     //okagv
+      bool idle =
+              ((idle_trajectories.count(constraint.submap_id.trajectory_id) != 0) ||
+              (idle_trajectories.count(constraint.node_id.trajectory_id) != 0));
+     if(idle) continue;
+
     problem.AddResidualBlock(
         CreateAutoDiffSpaCostFunction(constraint.pose),
         // Loop closure constraints should have a loss function.
@@ -297,14 +351,22 @@ void OptimizationProblem2D::Solve(
         C_nodes.at(constraint.node_id).data());
   }
   // Add cost functions for landmarks.
+  //LOG(INFO) << "okagv landmark_nodes.size " << landmark_nodes.size();
   AddLandmarkCostFunctions(landmark_nodes, node_data_, &C_nodes, &C_landmarks,
-                           &problem, options_.huber_scale());
+                           &problem, options_.huber_scale(), trajectories_state);
+  
   // Add penalties for violating odometry or changes between consecutive nodes
   // if odometry is not available.
   for (auto node_it = node_data_.begin(); node_it != node_data_.end();) {
     const int trajectory_id = node_it->id.trajectory_id;
     const auto trajectory_end = node_data_.EndOfTrajectory(trajectory_id);
     if (frozen_trajectories.count(trajectory_id) != 0) {
+      node_it = trajectory_end;
+      continue;
+    }
+
+    //okagv
+    if (idle_trajectories.count(trajectory_id) != 0){
       node_it = trajectory_end;
       continue;
     }
@@ -334,19 +396,22 @@ void OptimizationProblem2D::Solve(
             C_nodes.at(second_node_id).data());
       }
 
+      //okagv
       // Add a relative pose constraint based on consecutive local SLAM poses.
-      const transform::Rigid3d relative_local_slam_pose =
-          transform::Embed3D(first_node_data.local_pose_2d.inverse() *
-                             second_node_data.local_pose_2d);
-      problem.AddResidualBlock(
-          CreateAutoDiffSpaCostFunction(
-              Constraint::Pose{relative_local_slam_pose,
-                               options_.local_slam_pose_translation_weight(),
-                               options_.local_slam_pose_rotation_weight()}),
-          nullptr /* loss function */, C_nodes.at(first_node_id).data(),
-          C_nodes.at(second_node_id).data());
+
+      // const transform::Rigid3d relative_local_slam_pose =
+      //     transform::Embed3D(first_node_data.local_pose_2d.inverse() *
+      //                        second_node_data.local_pose_2d);
+      // problem.AddResidualBlock(
+      //     CreateAutoDiffSpaCostFunction(
+      //         Constraint::Pose{relative_local_slam_pose,
+      //                          options_.local_slam_pose_translation_weight(),
+      //                          options_.local_slam_pose_rotation_weight()}),
+      //     nullptr /* loss function */, C_nodes.at(first_node_id).data(),
+      //     C_nodes.at(second_node_id).data());
     }
   }
+  
 
   std::map<int, std::array<double, 3>> C_fixed_frames;
   for (auto node_it = node_data_.begin(); node_it != node_data_.end();) {
@@ -399,7 +464,7 @@ void OptimizationProblem2D::Solve(
           C_fixed_frames.at(trajectory_id).data(), C_nodes.at(node_id).data());
     }
   }
-
+  
   // Solve.
   ceres::Solver::Summary summary;
   ceres::Solve(
@@ -425,6 +490,7 @@ void OptimizationProblem2D::Solve(
   for (const auto& C_landmark : C_landmarks) {
     landmark_data_[C_landmark.first] = C_landmark.second.ToRigid();
   }
+  //LOG(INFO) << "okagv landmark_data_ size " << landmark_data_.size();
 }
 
 std::unique_ptr<transform::Rigid3d> OptimizationProblem2D::InterpolateOdometry(

@@ -33,20 +33,16 @@ bool isEqual(const Eigen::Array2i& lhs, const Eigen::Array2i& rhs) {
 // greater than zero. Return values are in pixels and not scaled.
 std::vector<Eigen::Array2i> RayToPixelMask(const Eigen::Array2i& scaled_begin,
                                            const Eigen::Array2i& scaled_end,
-                                           int subpixel_scale) 
-{
+                                           int subpixel_scale) {
   // For simplicity, we order 'scaled_begin' and 'scaled_end' by their x
   // coordinate.
-  if (scaled_begin.x() > scaled_end.x()) 
-  {
+  if (scaled_begin.x() > scaled_end.x()) {
     return RayToPixelMask(scaled_end, scaled_begin, subpixel_scale);
-    // 调换一下大小顺序
   }
 
   CHECK_GE(scaled_begin.x(), 0);
   CHECK_GE(scaled_begin.y(), 0);
   CHECK_GE(scaled_end.y(), 0);
-  // 检查是不是都大于等于零
   std::vector<Eigen::Array2i> pixel_mask;
   // Special case: We have to draw a vertical line in full pixels, as
   // 'scaled_begin' and 'scaled_end' have the same full pixel x coordinate.

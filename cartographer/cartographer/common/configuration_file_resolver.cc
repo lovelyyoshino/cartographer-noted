@@ -38,7 +38,7 @@ std::string ConfigurationFileResolver::GetFullPathOrDie(
     const std::string filename = path + "/" + basename;
     std::ifstream stream(filename.c_str());
     if (stream.good()) {
-      LOG(INFO) << "Found '" << filename << "' for '" << basename << "'.";
+      //LOG(INFO) << "Found '" << filename << "' for '" << basename << "'."; //okagv
       return filename;
     }
   }

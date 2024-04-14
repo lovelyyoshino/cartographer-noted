@@ -30,6 +30,8 @@ namespace sensor {
 // Stores 3D position of a point observed by a rangefinder sensor.
 struct RangefinderPoint {
   Eigen::Vector3f position;
+  //okagv
+  float intensity;
 };
 
 // Stores 3D position of a point with its relative measurement time.
@@ -44,6 +46,7 @@ inline RangefinderPoint operator*(const transform::Rigid3<T>& lhs,
                                   const RangefinderPoint& rhs) {
   RangefinderPoint result = rhs;
   result.position = lhs * rhs.position;
+  result.intensity = rhs.intensity; //okagv
   return result;
 }
 

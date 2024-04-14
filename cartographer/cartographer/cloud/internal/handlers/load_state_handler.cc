@@ -46,7 +46,7 @@ void LoadStateHandler::OnRequest(const proto::LoadStateRequest& request) {
 void LoadStateHandler::OnReadsDone() {
   auto trajectory_remapping =
       GetContext<MapBuilderContextInterface>()->map_builder().LoadState(
-          &reader_, load_frozen_state_);
+          &reader_, cartographer::mapping::PoseGraphInterface::TrajectoryState::FROZEN);
   for (const auto& entry : trajectory_remapping) {
     GetContext<MapBuilderContextInterface>()->RegisterClientIdForTrajectory(
         client_id_, entry.second);

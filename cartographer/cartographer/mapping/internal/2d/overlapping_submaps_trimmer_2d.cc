@@ -61,7 +61,7 @@ std::set<SubmapId> AddSubmapsToSubmapCoverageGrid2D(
   for (const auto& submap : submap_data) {
     auto freshness = submap_freshness.find(submap.id);
     if (freshness == submap_freshness.end()) continue;
-    if (!submap.data.submap->insertion_finished()) continue;
+    if (!submap.data.submap->insertion_finished()) ; //continue; //okagv change
     all_submap_ids.insert(submap.id);
     const Grid2D& grid =
         *std::static_pointer_cast<const Submap2D>(submap.data.submap)->grid();
@@ -184,11 +184,13 @@ std::vector<SubmapId> FindSubmapIdsToTrim(
 }  // namespace
 
 void OverlappingSubmapsTrimmer2D::Trim(Trimmable* pose_graph) {
+  /*
   const auto submap_data = pose_graph->GetOptimizedSubmapData();
   if (submap_data.size() - current_submap_count_ <= min_added_submaps_count_) {
-    return;
+    return; 
   }
-
+  
+  //LOG(INFO) << "okagv begin trimmer overlapping submap!";
   const MapLimits first_submap_map_limits =
       std::static_pointer_cast<const Submap2D>(submap_data.begin()->data.submap)
           ->grid()
@@ -204,8 +206,65 @@ void OverlappingSubmapsTrimmer2D::Trim(Trimmable* pose_graph) {
       min_covered_area_ / common::Pow2(coverage_grid.resolution()));
   current_submap_count_ = submap_data.size() - submap_ids_to_remove.size();
   for (const SubmapId& id : submap_ids_to_remove) {
+    LOG(INFO) << "okagv remove trajectory_id: " << id.trajectory_id << " submap_id: " << id.submap_index;
     pose_graph->TrimSubmap(id);
   }
+  */
+
+  for (int i = 0; i < submap_ids_to_remove.size(); i++) {
+    LOG(INFO) << "okagv remove trajectory_id: "
+              << submap_ids_to_remove[i].trajectory_id
+              << " submap_id: " << submap_ids_to_remove[i].submap_index;
+    pose_graph->TrimSubmap(submap_ids_to_remove[i]);
+  }
+      submap_ids_to_remove.clear();
+}
+
+void OverlappingSubmapsTrimmer2D::CheckRemovedSubmapId(Trimmable* pose_graph) {
+  const auto submap_data = pose_graph->GetOptimizedSubmapData();
+
+  // okagv init
+  //if (init_submap_count_ == 0) {
+  //  init_submap_count_ = submap_data.size();
+  //}
+
+  // okagv keep old map size of current environment
+  //if (submap_data.size() - init_submap_count_ <= min_added_submaps_count_) {
+    //LOG(INFO) << "okagv submap_data.size() " << submap_data.size();
+    //LOG(INFO) << "okagv init_submap_count_ " << init_submap_count_;
+    //LOG(INFO) << "okagv min_added_submaps_count_ "
+    //          << min_added_submaps_count_;
+    //return;
+  //}
+
+  if (submap_data.size() - current_submap_count_ <= min_added_submaps_count_) {
+    //LOG(INFO) << "okagv submap_data.size() " << submap_data.size();
+    //LOG(INFO) << "okagv current_submap_count_ " << current_submap_count_;
+    //LOG(INFO) << "okagv min_added_submaps_count_ "
+    //          << min_added_submaps_count_;
+    return;
+  }
+
+    if (submap_ids_to_remove.size() != 0) return;
+
+    // LOG(INFO) << "okagv begin trimmer overlapping submap!";
+    const MapLimits first_submap_map_limits =
+        std::static_pointer_cast<const Submap2D>(
+            submap_data.begin()->data.submap)
+            ->grid()
+            ->limits();
+    SubmapCoverageGrid2D coverage_grid(first_submap_map_limits);
+    const std::map<SubmapId, common::Time> submap_freshness =
+        ComputeSubmapFreshness(submap_data, pose_graph->GetTrajectoryNodes(),
+                               pose_graph->GetConstraints());
+    const std::set<SubmapId> all_submap_ids = AddSubmapsToSubmapCoverageGrid2D(
+        submap_freshness, submap_data, &coverage_grid);
+    submap_ids_to_remove = FindSubmapIdsToTrim(
+        coverage_grid, all_submap_ids, fresh_submaps_count_,
+        min_covered_area_ / common::Pow2(coverage_grid.resolution()));
+     current_submap_count_ = submap_data.size() - submap_ids_to_remove.size();
+    //LOG(INFO) << "okagv submap_ids_to_remove.size() " << submap_ids_to_remove.size();
+  
 }
 
 }  // namespace mapping

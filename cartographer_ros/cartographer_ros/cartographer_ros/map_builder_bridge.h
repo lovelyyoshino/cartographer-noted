@@ -38,6 +38,8 @@
 #include "geometry_msgs/TransformStamped.h"
 #include "nav_msgs/OccupancyGrid.h"
 
+#include "cartographer_ros/map_builder_server_options.h"
+
 // Abseil unfortunately pulls in winnt.h, which #defines DELETE.
 // Clean up to unbreak visualization_msgs::Marker::DELETE.
 #ifdef DELETE
@@ -45,31 +47,45 @@
 #endif
 #include "visualization_msgs/MarkerArray.h"
 
+//okagv
+#include "cartographer/mapping/map_builder_interface.h"
+//okagv
+#include "cartographer_ros_msgs/StartTrajectory.h"
+#include "cartographer_ros_msgs/WriteState.h"
+
 namespace cartographer_ros {
+
+using TrajectoryType =
+::cartographer::mapping::MapBuilderInterface::TrajectoryType;
+
+using ThreadPoolState =
+    ::cartographer::mapping::PoseGraphInterface::ThreadPoolState;
 
 class MapBuilderBridge {
  public:
-  struct LocalTrajectoryData
-   {//局部local——SLAM结果的结构
-
+  struct LocalTrajectoryData {
     // Contains the trajectory data received from local SLAM, after
     // it had processed accumulated 'range_data_in_local' and estimated
     // current 'local_pose' at 'time'.
-    struct LocalSlamData 
-    {
+    struct LocalSlamData {
       ::cartographer::common::Time time;
-      ::cartographer::transform::Rigid3d local_pose;                        //优化匹配结果的位姿，在submap的局部坐标系位姿
-      ::cartographer::sensor::RangeData range_data_in_local;                //雷达信息 点云容器类
+      ::cartographer::transform::Rigid3d local_pose;
+      ::cartographer::sensor::RangeData range_data_in_local;
     };
-    std::shared_ptr<const LocalSlamData> local_slam_data;                   //本地slam 数据
-    cartographer::transform::Rigid3d local_to_map;                          //submap到global 位姿变换
-    std::unique_ptr<cartographer::transform::Rigid3d> published_to_tracking;//猜测是要输入PoseExtrapolator,位姿插值器
-    TrajectoryOptions trajectory_options;                                   //配置参数
+
+    std::shared_ptr<const LocalSlamData> local_slam_data;
+    cartographer::transform::Rigid3d local_to_map;
+    std::unique_ptr<cartographer::transform::Rigid3d> published_to_tracking;
+    TrajectoryOptions trajectory_options;
+    //okagv
+
+    double covariance_score;
+    bool is_update_score;
   };
 
   MapBuilderBridge(
       const NodeOptions& node_options,
-      std::unique_ptr<cartographer::mapping::MapBuilderInterface> map_builder,//数据类型MapBuilderInterface
+      std::shared_ptr<cartographer::mapping::MapBuilderInterface> map_builder,
       tf2_ros::Buffer* tf_buffer);
 
   MapBuilderBridge(const MapBuilderBridge&) = delete;
@@ -85,6 +101,10 @@ class MapBuilderBridge {
   void RunFinalOptimization();
   bool SerializeState(const std::string& filename,
                       const bool include_unfinished_submaps);
+  //okagv
+  bool SerializeStateWithId(const std::string& filename,
+                            int &trajectory_id,
+                            const bool include_unfinished_submaps);
 
   void HandleSubmapQuery(
       cartographer_ros_msgs::SubmapQuery::Request& request,
@@ -105,6 +125,67 @@ class MapBuilderBridge {
 
   SensorBridge* sensor_bridge(int trajectory_id);
 
+  //okagv
+    int AddTrajectoryWithId(
+      const int trajectory_id,
+      const std::set<
+          ::cartographer::mapping::TrajectoryBuilderInterface::SensorId>&
+          expected_sensor_ids,
+      const TrajectoryOptions& trajectory_options);
+
+  //okagv
+  ::cartographer::mapping::PoseGraphInterface::OKagvOrder
+  GetOKagv_Order();
+  //okagv
+  void SetOKagv_Order(::cartographer::mapping::PoseGraphInterface::OKagvOrder order);
+  //okagv
+  void SetTrajectoryStates(int trajectory_id, 
+                           ::cartographer::mapping::PoseGraphInterface::TrajectoryState state);
+
+  //okagv
+  ::cartographer::mapping::PoseGraphInterface::OKagvFeedback GetOKagv_Feedback();
+  void SetOKagv_Feedback(::cartographer::mapping::PoseGraphInterface::OKagvFeedback feedback);
+
+  //okagv
+  void SetInitialPose(bool &use_initial_pose,
+                      int &trajectory_id,
+                      ::cartographer::transform::Rigid3d &initial_pose);
+
+    //okagv
+  void LoadTrajectory(
+      int trajectory_id,
+      const std::string& state_filename, 
+      ::cartographer::mapping::PoseGraphInterface::TrajectoryState state);
+  void DeleteTrajectory(
+      int trajectory_id);
+  void LocalizeTrajectory(
+      int trajectory_id,
+      bool use_initial_pose,
+      const geometry_msgs::Pose initial_pose);
+
+  //okagv
+  void SetTrajectoryTypeWithId(TrajectoryType type, int id);
+
+  //okagv
+  TrajectoryType GetTrajectoryTypeWithId(int id);
+
+  //okagv
+  std::shared_ptr<cartographer::mapping::MapBuilderInterface> map_builder(){ return map_builder_;}
+
+  //okagv
+  void GetOkagvOrderStartTrajectoryRequest(::cartographer_ros_msgs::StartTrajectory::Request& request);
+  //okagv
+  void GetOkagvOrderSaveTrajectoryRequest(::cartographer_ros_msgs::WriteState::Request& request);
+
+  //okagv
+  void RegisterClientIdForTrajectory(int trajectory_id, std::string trajectory_name);
+
+  //okagv
+  ThreadPoolState GetThreadPoolState();
+
+  //okagv
+  void SetMapBuilderOptions(cartographer::cloud::proto::MapBuilderServerOptions& option);
+
  private:
   void OnLocalSlamResult(const int trajectory_id,
                          const ::cartographer::common::Time time,
@@ -117,7 +198,7 @@ class MapBuilderBridge {
   std::unordered_map<int,
                      std::shared_ptr<const LocalTrajectoryData::LocalSlamData>>
       local_slam_data_ GUARDED_BY(mutex_);
-  std::unique_ptr<cartographer::mapping::MapBuilderInterface> map_builder_;
+  std::shared_ptr<cartographer::mapping::MapBuilderInterface> map_builder_;
   tf2_ros::Buffer* const tf_buffer_;
 
   std::unordered_map<std::string /* landmark ID */, int> landmark_to_index_;
@@ -125,8 +206,6 @@ class MapBuilderBridge {
   // These are keyed with 'trajectory_id'.
   std::unordered_map<int, TrajectoryOptions> trajectory_options_;
   std::unordered_map<int, std::unique_ptr<SensorBridge>> sensor_bridges_;
-//   区别在于std::map底层使用红黑树，而std::unordered_map使用的是hash map。时间复杂度 O(n)
-//  本质xihabiao
   std::unordered_map<int, size_t> trajectory_to_highest_marker_id_;
 };
 

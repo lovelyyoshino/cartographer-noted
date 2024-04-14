@@ -42,8 +42,10 @@ TRAJECTORY_BUILDER_2D = {
     rotation_delta_cost_weight = 1e-1,
   },
 
+  use_intensity_ceres_scan_matching = false,
   ceres_scan_matcher = {
     occupied_space_weight = 1.,
+    intensity_space_weight = 1., --okagv 
     translation_weight = 10.,
     rotation_weight = 40.,
     ceres_solver_options = {

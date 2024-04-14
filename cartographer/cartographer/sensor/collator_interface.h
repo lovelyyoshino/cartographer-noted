@@ -62,6 +62,9 @@ class CollatorInterface {
   // unblocked. Returns 'nullopt' for implementations that do not wait for a
   // particular trajectory.
   virtual absl::optional<int> GetBlockingTrajectoryId() const = 0;
+
+  //okagv
+  virtual void DeleteTrajectory(int trajectory_id)  = 0;
 };
 
 }  // namespace sensor

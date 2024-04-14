@@ -42,17 +42,16 @@ proto::SubmapsOptions2D CreateSubmapsOptions2D(
 
 class Submap2D : public Submap {
  public:
-  Submap2D(const Eigen::Vector2f& origin,                                      
-           //原点坐标
-           std::unique_ptr<Grid2D> grid,                                      
-            //Grid2D类型 , 存储栅格坐标 和 坐标上的概率
-           ValueConversionTables* conversion_tables);                          
-           //map 边界信息表(新增变量)
+  Submap2D(const Eigen::Vector2f& origin, std::unique_ptr<Grid2D> grid,
+           ValueConversionTables* conversion_tables);
+
+  //okagv
+  Submap2D(const Eigen::Vector2f& origin, std::unique_ptr<Grid2D> grid, std::unique_ptr<Grid2D> intensity_grid,
+           ValueConversionTables* conversion_tables);
+
   explicit Submap2D(const proto::Submap2D& proto,
                     ValueConversionTables* conversion_tables);
-// -----------------------------------------------------
-// 实现接口Submap中的三个成员函数
-// -----------------------------------------------------
+
   proto::Submap ToProto(bool include_grid_data) const override;
   void UpdateFromProto(const proto::Submap& proto) override;
 
@@ -61,6 +60,9 @@ class Submap2D : public Submap {
 
   const Grid2D* grid() const { return grid_.get(); }
 
+  //okagv
+  const Grid2D* intensity_grid() const { return intensity_grid_.get(); };
+
   // Insert 'range_data' into this submap using 'range_data_inserter'. The
   // submap must not be finished yet.
   void InsertRangeData(const sensor::RangeData& range_data,
@@ -68,9 +70,11 @@ class Submap2D : public Submap {
   void Finish();
 
  private:
-  std::unique_ptr<Grid2D> grid_;                                                
-  //概率图数据变量
+  std::unique_ptr<Grid2D> grid_;
   ValueConversionTables* conversion_tables_;
+
+  //okagv
+  std::unique_ptr<Grid2D> intensity_grid_;
 };
 
 // The first active submap will be created on the insertion of the first range
@@ -83,11 +87,6 @@ class Submap2D : public Submap {
 // considered initialized: the old submap is no longer changed, the "new" submap
 // is now the "old" submap and is used for scan-to-map matching. Moreover, a
 // "new" submap gets created. The "old" submap is forgotten by this object.
-// ActiveSubmaps2D类维护了两个submap,一个old 和一个new，
-// old用于matching，而new用于插入
-// 当new submap达到一定数量时，则停止插入。
-// 抛弃old，将new变为old
-// 创建一个新的new submap
 class ActiveSubmaps2D {
  public:
   explicit ActiveSubmaps2D(const proto::SubmapsOptions2D& options);
@@ -96,29 +95,23 @@ class ActiveSubmaps2D {
   ActiveSubmaps2D& operator=(const ActiveSubmaps2D&) = delete;
 
   // Inserts 'range_data' into the Submap collection.
-  // 插入激光数据
   std::vector<std::shared_ptr<const Submap2D>> InsertRangeData(
-                                                 const sensor::RangeData& range_data);
-// 定义子图容器
+      const sensor::RangeData& range_data);
+
   std::vector<std::shared_ptr<const Submap2D>> submaps() const;
 
+  //okagv
+  void clearActiveSubmaps();
+
  private:
-  //激光数据插入器接口
   std::unique_ptr<RangeDataInserterInterface> CreateRangeDataInserter();
- //根据原点位置 创建栅格接口
   std::unique_ptr<GridInterface> CreateGrid(const Eigen::Vector2f& origin);
-  // 没有使用
-  void FinishSubmap();  
-  //加入一个新的子图
+  void FinishSubmap();
   void AddSubmap(const Eigen::Vector2f& origin);
 
-// 子图参数配置设置
   const proto::SubmapsOptions2D options_;
-  //全局子图指针 // 维护submap2d的列表
   std::vector<std::shared_ptr<Submap2D>> submaps_;
-  // 插入器接口
   std::unique_ptr<RangeDataInserterInterface> range_data_inserter_;
-   // uint16到浮点数 转换表格
   ValueConversionTables conversion_tables_;
 };
 

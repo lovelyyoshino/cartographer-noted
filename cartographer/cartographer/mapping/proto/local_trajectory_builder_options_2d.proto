@@ -55,6 +55,9 @@ message LocalTrajectoryBuilderOptions2D {
   bool use_online_correlative_scan_matching = 5;
   cartographer.mapping.scan_matching.proto.RealTimeCorrelativeScanMatcherOptions
       real_time_correlative_scan_matcher_options = 7;
+
+  //okagv
+  bool use_intensity_ceres_scan_matching = 4;
   cartographer.mapping.scan_matching.proto.CeresScanMatcherOptions2D
       ceres_scan_matcher_options = 8;
   MotionFilterOptions motion_filter_options = 13;

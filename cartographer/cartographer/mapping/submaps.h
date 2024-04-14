@@ -13,15 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// -----------------------------------------------------------------------------------
-// -----------------------------------------------------------------------------------
-// 该文件根据2d或者3d在submap2D.cpp 或者submap3D.cpp 中实现
-// -----------------------------------------------------------------------------------
-// -----------------------------------------------------------------------------------
-// --------------------------------------------------------------------------
-// --------------------------------------------------------------------------
-// 主要处理子图的位姿 子图状态(是否完成)  子图的proto类型数据 以及转换proto
-// --------------------------------------------------------------------------
+
 #ifndef CARTOGRAPHER_MAPPING_SUBMAPS_H_
 #define CARTOGRAPHER_MAPPING_SUBMAPS_H_
 
@@ -64,57 +56,38 @@ inline uint8 ProbabilityToLogOddsInteger(const float probability) {
 // track of how many range data were inserted into it, and sets
 // 'insertion_finished' when the map no longer changes and is ready for loop
 // closing.
-
 class Submap {
  public:
-  Submap(const transform::Rigid3d& local_submap_pose)                       
-  //将局部slam位姿局部变量,赋值到全局位姿变量
+  Submap(const transform::Rigid3d& local_submap_pose)
       : local_pose_(local_submap_pose) {}
   virtual ~Submap() {}
 
-
-// 序列化与反序列化
-// 三个纯虚类 需要继承它的 类去实现
-  virtual proto::Submap ToProto(bool include_grid_data) const = 0;          
-  //栅格数据序列化 
-  virtual void UpdateFromProto(const proto::Submap& proto) = 0;             
-  //更新子图 在proto中的信息
+  virtual proto::Submap ToProto(bool include_grid_data) const = 0;
+  virtual void UpdateFromProto(const proto::Submap& proto) = 0;
 
   // Fills data into the 'response'.
- 
-  virtual void ToResponseProto(                                            
-     // 把submap的放入到response的proto流中。
-      const transform::Rigid3d& global_submap_pose,                         
-      //方便service中查询submap讯息
-      proto::SubmapQuery::Response* response) const = 0;                                                                     
-      
+  virtual void ToResponseProto(
+      const transform::Rigid3d& global_submap_pose,
+      proto::SubmapQuery::Response* response) const = 0;
 
   // Pose of this submap in the local map frame.
-  transform::Rigid3d local_pose() const { return local_pose_; }              
-  //返回submap在局部地图中的位姿局部位姿    local_pose_
+  transform::Rigid3d local_pose() const { return local_pose_; }
 
   // Number of RangeData inserted.
-  int num_range_data() const { return num_range_data_; }                     
-  //返回该子图激光数量 是帧  ??????????
-  void set_num_range_data(const int num_range_data) {                        
-    //将局部激光数量变量 赋值到 全局变量 
+  int num_range_data() const { return num_range_data_; }
+  void set_num_range_data(const int num_range_data) {
     num_range_data_ = num_range_data;
   }
 
-  bool insertion_finished() const { return insertion_finished_; }            
-  // 查看布尔型成员变量finished_，即该子图是否还需要更新
-  void set_insertion_finished(bool insertion_finished) {                     
-    //设置该子图已经完成
+  bool insertion_finished() const { return insertion_finished_; }
+  void set_insertion_finished(bool insertion_finished) {
     insertion_finished_ = insertion_finished;
   }
 
  private:
-  const transform::Rigid3d local_pose_;                                      
-  //  局部位姿
-  int num_range_data_ = 0;                                                  
-   //  激光帧数
-  bool insertion_finished_ = false;                                          
-  //  子图信息插入完成状态
+  const transform::Rigid3d local_pose_;
+  int num_range_data_ = 0;
+  bool insertion_finished_ = false;
 };
 
 }  // namespace mapping

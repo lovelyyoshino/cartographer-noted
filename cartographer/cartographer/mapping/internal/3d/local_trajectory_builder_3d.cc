@@ -82,18 +82,13 @@ std::unique_ptr<transform::Rigid3d> LocalTrajectoryBuilder3D::ScanMatch(
 
   transform::Rigid3d pose_observation_in_submap;
   ceres::Solver::Summary summary;
-  const auto* high_resolution_intensity_hybrid_grid =
-      options_.use_intensities()
-          ? &matching_submap->high_resolution_intensity_hybrid_grid()
-          : nullptr;
   ceres_scan_matcher_->Match(
       (matching_submap->local_pose().inverse() * pose_prediction).translation(),
-      initial_ceres_pose, {{&high_resolution_point_cloud_in_tracking,
-                            &matching_submap->high_resolution_hybrid_grid(),
-                            high_resolution_intensity_hybrid_grid},
-                           {&low_resolution_point_cloud_in_tracking,
-                            &matching_submap->low_resolution_hybrid_grid(),
-                            /*intensity_hybrid_grid=*/nullptr}},
+      initial_ceres_pose,
+      {{&high_resolution_point_cloud_in_tracking,
+        &matching_submap->high_resolution_hybrid_grid()},
+       {&low_resolution_point_cloud_in_tracking,
+        &matching_submap->low_resolution_hybrid_grid()}},
       &pose_observation_in_submap, &summary);
   kCeresScanMatcherCostMetric->Observe(summary.final_cost);
   const double residual_distance = (pose_observation_in_submap.translation() -
@@ -122,6 +117,7 @@ void LocalTrajectoryBuilder3D::AddImuData(const sensor::ImuData& imu_data) {
     initial_imu_data.push_back(sensor::FromProto(imu));
   }
   initial_imu_data.push_back(imu_data);
+
   extrapolator_ = mapping::PoseExtrapolatorInterface::CreateWithImuData(
       options_.pose_extrapolator_options(), initial_imu_data, initial_poses);
 }
@@ -130,12 +126,6 @@ std::unique_ptr<LocalTrajectoryBuilder3D::MatchingResult>
 LocalTrajectoryBuilder3D::AddRangeData(
     const std::string& sensor_id,
     const sensor::TimedPointCloudData& unsynchronized_data) {
-  if (options_.use_intensities()) {
-    CHECK_EQ(unsynchronized_data.ranges.size(),
-             unsynchronized_data.intensities.size())
-        << "Passed point cloud has inconsistent number of intensities and "
-           "ranges.";
-  }
   auto synchronized_data =
       range_data_collator_.AddRangeData(sensor_id, unsynchronized_data);
   if (synchronized_data.ranges.empty()) {
@@ -164,8 +154,9 @@ LocalTrajectoryBuilder3D::AddRangeData(
     accumulated_point_cloud_origin_data_.clear();
   }
 
-  synchronized_data.ranges = sensor::VoxelFilter(
-      synchronized_data.ranges, 0.5f * options_.voxel_filter_size());
+  synchronized_data.ranges =
+      sensor::VoxelFilter(0.5f * options_.voxel_filter_size())
+          .Filter(synchronized_data.ranges);
   accumulated_point_cloud_origin_data_.emplace_back(
       std::move(synchronized_data));
   ++num_accumulated_;
@@ -206,14 +197,7 @@ LocalTrajectoryBuilder3D::AddRangeData(
   hits_poses.push_back(extrapolation_result.current_pose.cast<float>());
   CHECK_EQ(hits_poses.size(), hit_times.size());
 
-  const size_t max_possible_number_of_accumulated_points = hit_times.size();
-  std::vector<sensor::RangefinderPoint> accumulated_points;
-  std::vector<float> accumulated_intensities;
-  accumulated_points.reserve(max_possible_number_of_accumulated_points);
-  if (options_.use_intensities()) {
-    accumulated_intensities.reserve(max_possible_number_of_accumulated_points);
-  }
-  sensor::PointCloud misses;
+  sensor::RangeData accumulated_range_data;
   std::vector<transform::Rigid3f>::const_iterator hits_poses_it =
       hits_poses.begin();
   for (const auto& point_cloud_origin_data :
@@ -227,17 +211,13 @@ LocalTrajectoryBuilder3D::AddRangeData(
       const float range = delta.norm();
       if (range >= options_.min_range()) {
         if (range <= options_.max_range()) {
-          accumulated_points.push_back(sensor::RangefinderPoint{hit_in_local});
-          if (options_.use_intensities()) {
-            accumulated_intensities.push_back(hit.intensity);
-          }
+          accumulated_range_data.returns.push_back(
+              sensor::RangefinderPoint{hit_in_local});
         } else {
           // We insert a ray cropped to 'max_range' as a miss for hits beyond
           // the maximum range. This way the free space up to the maximum range
           // will be updated.
-          // TODO(wohe): since `misses` are not used anywhere in 3D, consider
-          // removing `misses` from `range_data` and/or everywhere in 3D.
-          misses.push_back(sensor::RangefinderPoint{
+          accumulated_range_data.misses.push_back(sensor::RangefinderPoint{
               origin_in_local + options_.max_range() / range * delta});
         }
       }
@@ -245,8 +225,6 @@ LocalTrajectoryBuilder3D::AddRangeData(
     }
   }
   CHECK(std::next(hits_poses_it) == hits_poses.end());
-  const sensor::PointCloud returns(std::move(accumulated_points),
-                                   std::move(accumulated_intensities));
 
   const common::Time current_sensor_time = synchronized_data.time;
   absl::optional<common::Duration> sensor_duration;
@@ -259,8 +237,10 @@ LocalTrajectoryBuilder3D::AddRangeData(
   const auto voxel_filter_start = std::chrono::steady_clock::now();
   const sensor::RangeData filtered_range_data = {
       extrapolation_result.current_pose.translation().cast<float>(),
-      sensor::VoxelFilter(returns, options_.voxel_filter_size()),
-      sensor::VoxelFilter(misses, options_.voxel_filter_size())};
+      sensor::VoxelFilter(options_.voxel_filter_size())
+          .Filter(accumulated_range_data.returns),
+      sensor::VoxelFilter(options_.voxel_filter_size())
+          .Filter(accumulated_range_data.misses)};
   const auto voxel_filter_stop = std::chrono::steady_clock::now();
   const auto voxel_filter_duration = voxel_filter_stop - voxel_filter_start;
 
@@ -294,18 +274,19 @@ LocalTrajectoryBuilder3D::AddAccumulatedRangeData(
 
   const auto scan_matcher_start = std::chrono::steady_clock::now();
 
+  sensor::AdaptiveVoxelFilter adaptive_voxel_filter(
+      options_.high_resolution_adaptive_voxel_filter_options());
   const sensor::PointCloud high_resolution_point_cloud_in_tracking =
-      sensor::AdaptiveVoxelFilter(
-          filtered_range_data_in_tracking.returns,
-          options_.high_resolution_adaptive_voxel_filter_options());
+      adaptive_voxel_filter.Filter(filtered_range_data_in_tracking.returns);
   if (high_resolution_point_cloud_in_tracking.empty()) {
     LOG(WARNING) << "Dropped empty high resolution point cloud data.";
     return nullptr;
   }
+  sensor::AdaptiveVoxelFilter low_resolution_adaptive_voxel_filter(
+      options_.low_resolution_adaptive_voxel_filter_options());
   const sensor::PointCloud low_resolution_point_cloud_in_tracking =
-      sensor::AdaptiveVoxelFilter(
-          filtered_range_data_in_tracking.returns,
-          options_.low_resolution_adaptive_voxel_filter_options());
+      low_resolution_adaptive_voxel_filter.Filter(
+          filtered_range_data_in_tracking.returns);
   if (low_resolution_point_cloud_in_tracking.empty()) {
     LOG(WARNING) << "Dropped empty low resolution point cloud data.";
     return nullptr;
@@ -474,6 +455,12 @@ void LocalTrajectoryBuilder3D::RegisterMetrics(
       residuals->Add({{"component", "distance"}});
   kScanMatcherResidualAngleMetric = residuals->Add({{"component", "angle"}});
 }
+
+      //okagv
+  void LocalTrajectoryBuilder3D::ClearOldData()
+  {
+    return;
+  }
 
 }  // namespace mapping
 }  // namespace cartographer

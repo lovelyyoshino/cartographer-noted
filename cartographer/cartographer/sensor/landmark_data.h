@@ -34,11 +34,17 @@ struct LandmarkObservation {
   transform::Rigid3d landmark_to_tracking_transform;
   double translation_weight;
   double rotation_weight;
+  std::string type;
+
+    //okagv
+  transform::Rigid3d landmark_to_map_transform;
 };
 
 struct LandmarkData {
   common::Time time;
   std::vector<LandmarkObservation> landmark_observations;
+  //okagv
+  transform::Rigid3d global_landmark_pose;
 };
 
 // Converts 'landmark_data' to a proto::LandmarkData.

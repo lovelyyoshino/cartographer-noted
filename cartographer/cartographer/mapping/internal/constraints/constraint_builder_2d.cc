@@ -24,8 +24,6 @@
 #include <memory>
 #include <sstream>
 #include <string>
-#include <tuple>
-#include <utility>
 
 #include "Eigen/Eigenvalues"
 #include "absl/memory/memory.h"
@@ -57,12 +55,13 @@ transform::Rigid2d ComputeSubmapPose(const Submap2D& submap) {
 }
 
 ConstraintBuilder2D::ConstraintBuilder2D(
-    const constraints::proto::ConstraintBuilderOptions& options,
+    constraints::proto::ConstraintBuilderOptions& options,
     common::ThreadPoolInterface* const thread_pool)
     : options_(options),
       thread_pool_(thread_pool),
       finish_node_task_(absl::make_unique<common::Task>()),
       when_done_task_(absl::make_unique<common::Task>()),
+      sampler_(options.sampling_ratio()),
       ceres_scan_matcher_(options.ceres_scan_matcher_options()) {}
 
 ConstraintBuilder2D::~ConstraintBuilder2D() {
@@ -80,15 +79,15 @@ void ConstraintBuilder2D::MaybeAddConstraint(
     const transform::Rigid2d& initial_relative_pose) {
   if (initial_relative_pose.translation().norm() >
       options_.max_constraint_distance()) {
+        //LOG(INFO) << "okagv up to options_.max_constraint_distance() " << options_.max_constraint_distance();
     return;
   }
-  if (!per_submap_sampler_
-           .emplace(std::piecewise_construct, std::forward_as_tuple(submap_id),
-                    std::forward_as_tuple(options_.sampling_ratio()))
-           .first->second.Pulse()) {
+  if (!sampler_.Pulse()) 
+  {
+    //LOG(INFO) << "okagv sampler pulse";
     return;
   }
-
+  
   absl::MutexLock locker(&mutex_);
   if (when_done_) {
     LOG(WARNING)
@@ -129,6 +128,97 @@ void ConstraintBuilder2D::MaybeAddGlobalConstraint(
     ComputeConstraint(submap_id, submap, node_id, true, /* match_full_submap */
                       constant_data, transform::Rigid2d::Identity(),
                       *scan_matcher, constraint);
+  });
+  constraint_task->AddDependency(scan_matcher->creation_task_handle);
+  auto constraint_task_handle =
+      thread_pool_->Schedule(std::move(constraint_task));
+  finish_node_task_->AddDependency(constraint_task_handle);
+}
+
+void ConstraintBuilder2D::MaybeAddGlobalRelocalizationConstraint(
+    const SubmapId& submap_id, const Submap2D* const submap,
+    const NodeId& node_id, const TrajectoryNode::Data* const constant_data) {
+  absl::MutexLock locker(&mutex_);
+  if (when_done_) {
+    LOG(WARNING)
+        << "MaybeAddGlobalConstraint was called while WhenDone was scheduled.";
+  }
+  constraints_.emplace_back();
+  kQueueLengthMetric->Set(constraints_.size());
+  auto* const constraint = &constraints_.back();
+  const auto* scan_matcher =
+      DispatchScanMatcherConstruction(submap_id, submap->grid());
+  auto constraint_task = absl::make_unique<common::Task>();
+  constraint_task->SetWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+    ComputeConstraint(submap_id, submap, node_id, true, /* match_full_submap */
+                      constant_data, transform::Rigid2d::Identity(),
+                      *scan_matcher, constraint);
+  });
+  constraint_task->AddDependency(scan_matcher->creation_task_handle);
+  auto constraint_task_handle =
+      thread_pool_->Schedule(std::move(constraint_task));
+  finish_node_task_->AddDependency(constraint_task_handle);
+}
+
+  void ConstraintBuilder2D::MaybeAddRelocalizationConstraint(const SubmapId& submap_id, const Submap2D* submap,
+        const NodeId& node_id,
+        const TrajectoryNode::Data* const constant_data,
+        const transform::Rigid2d& initial_relative_pose){
+
+  absl::MutexLock locker(&mutex_);
+  if (when_done_) {
+    LOG(WARNING)
+        << "MaybeAddConstraint was called while WhenDone was scheduled.";
+        return;
+  }
+  constraints_.emplace_back();
+  kQueueLengthMetric->Set(constraints_.size());
+  auto* const constraint = &constraints_.back();
+  const auto* scan_matcher =
+      DispatchScanMatcherConstruction(submap_id, submap->grid());
+  auto constraint_task = absl::make_unique<common::Task>();
+  constraint_task->SetWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+    ComputeConstraintForRelocalization(submap_id, submap, node_id, false, /* match_full_submap */
+                      constant_data, initial_relative_pose, *scan_matcher,
+                      constraint);
+  });
+  constraint_task->AddDependency(scan_matcher->creation_task_handle);
+  auto constraint_task_handle =
+      thread_pool_->Schedule(std::move(constraint_task));
+  finish_node_task_->AddDependency(constraint_task_handle);
+}
+
+void ConstraintBuilder2D::MaybeAddNavigationConstraint(
+    const SubmapId& submap_id, const Submap2D* submap, const NodeId& node_id,
+    const TrajectoryNode::Data* const constant_data,
+    const transform::Rigid2d& initial_relative_pose) {
+  if (initial_relative_pose.translation().norm() >
+      options_.max_constraint_distance()) {
+    // options_.max_constraint_distance();
+    return;
+  }
+
+  /*
+  if (!sampler_.Pulse()) {
+    return;
+  }
+  */
+
+  absl::MutexLock locker(&mutex_);
+  if (when_done_) {
+    LOG(WARNING)
+        << "MaybeAddConstraint was called while WhenDone was scheduled.";
+  }
+  constraints_.emplace_back();
+  kQueueLengthMetric->Set(constraints_.size());
+  auto* const constraint = &constraints_.back();
+  const auto* scan_matcher =
+      DispatchScanMatcherConstruction(submap_id, submap->grid());
+  auto constraint_task = absl::make_unique<common::Task>();
+  constraint_task->SetWorkItem([=]() LOCKS_EXCLUDED(mutex_) {
+    ComputeConstraint(submap_id, submap, node_id, false, /* match_full_submap */
+                      constant_data, initial_relative_pose, *scan_matcher,
+                      constraint);
   });
   constraint_task->AddDependency(scan_matcher->creation_task_handle);
   auto constraint_task_handle =
@@ -202,6 +292,10 @@ void ConstraintBuilder2D::ComputeConstraint(
   // - the result 'pose_estimate' of Match() (map <- node j).
   // - the ComputeSubmapPose() (map <- submap i)
   float score = 0.;
+  is_score_update = false;
+  //okagv
+  //covariance_score_ = 0.;
+
   transform::Rigid2d pose_estimate = transform::Rigid2d::Identity();
 
   // Compute 'pose_estimate' in three stages:
@@ -222,16 +316,88 @@ void ConstraintBuilder2D::ComputeConstraint(
       return;
     }
   } else {
+    //LOG(INFO) << "okagv Start fast_correlative_scan_matcher";
+    if (node_id.trajectory_id == 1001 &&
+        (node_id.trajectory_id != submap_id.trajectory_id)) 
+    {
+        //LOG(INFO) << "okagv submap_id trajectory_id: " << submap_id.trajectory_id << " submap_id submap_index: " << submap_id.submap_index;
+        //LOG(INFO) << "okagv node_id trajectory_id: " << node_id.trajectory_id << " node_id node_index: " << node_id.node_index;
+        //LOG(INFO) << "okagv options_.min_score() " << options_.min_score();
+    }
     kConstraintsSearchedMetric->Increment();
     if (submap_scan_matcher.fast_correlative_scan_matcher->Match(
             initial_pose, constant_data->filtered_gravity_aligned_point_cloud,
             options_.min_score(), &score, &pose_estimate)) {
+      //LOG(INFO) << "okagv submap_id trajectory_id: " << submap_id.trajectory_id << " submap_id submap_index: " << submap_id.submap_index;
+      //LOG(INFO) << "okagv node_id trajectory_id: " << node_id.trajectory_id << " node_id node_index: " << node_id.node_index;
+      //LOG(INFO) << "okagv trajectory_id same local score: " << score;
+      //LOG(INFO) << "okagv initial_pose x : " << initial_pose.translation()(0,0);
+      //LOG(INFO) << "okagv initial_pose y : " << initial_pose.translation()(1,0);
+      //LOG(INFO) << "okagv initial_pose angle : " << initial_pose.rotation().angle() * 180.0 / 3.1415926;
+      //LOG(INFO) << "okagv pose_estimate x : " << pose_estimate.translation()(0,0);
+      //LOG(INFO) << "okagv pose_estimate y : " << pose_estimate.translation()(1,0);
+      //LOG(INFO) << "okagv pose_estimate angle : " << pose_estimate.rotation().angle() * 180.0 / 3.1415926;
+      //LOG(INFO) << "---------------------------------------------------------------------------------------";
+
+      //okagv test
+      //return;
+      
+      double distance_variety = (initial_pose.inverse() * pose_estimate).translation().norm();
+      //LOG(INFO) << "okagv max_match_variety_distance " << options_.max_match_variety_distance();
+      if(distance_variety > options_.max_match_variety_distance()) //covariance_score_ > 0.5 && 
+      {
+          //LOG(WARNING) << "okagv distance_variety " << distance_variety;
+          //LOG(INFO) << "okagv local covariance_score_ " << covariance_score_; 
+          return;
+      }
+
+
+      //test
+
+      if (distance_variety > 0.02) {
+        LOG(WARNING) << "okagv  node_id : " << node_id.trajectory_id
+                     << " , submap_id : " << submap_id.trajectory_id
+                     << " , distance_variety > 0.02 , value is "
+                     << distance_variety;
+      }
+
+          // LOG(INFO) << "okagv local covariance_score_ " <<
+          // covariance_score_;
+      
+
       // We've reported a successful local match.
       CHECK_GT(score, options_.min_score());
       kConstraintsFoundMetric->Increment();
       kConstraintScoresMetric->Observe(score);
-    } else {
+    }else{
+      //LOG(INFO) << "okagv local score: " << score;
       return;
+    }
+
+    // okagv
+    //if (node_id.trajectory_id == 1001 &&
+    //    (node_id.trajectory_id != submap_id.trajectory_id)) {
+
+
+    if (node_id.trajectory_id == 1001 &&
+        (node_id.trajectory_id != submap_id.trajectory_id)) {
+      common::Time current_Time = constant_data->time;
+
+      if (current_Time - last_match_time_ < common::FromSeconds(0.5)) {
+        if (covariance_score_ < score) {
+          covariance_score_ = score;
+          last_match_time_ = current_Time;
+          is_score_update = true;
+          //LOG(INFO) << "okagv find better covariance_score_ " << covariance_score_;
+          //LOG(INFO) << "okagv navigation score " << covariance_score_;
+        }
+      } else {
+        covariance_score_ = score;
+        is_score_update = true;
+        //LOG(INFO) << "okagv navigation score " << covariance_score_;
+      }
+
+      last_match_time_ = current_Time;
     }
   }
   {
@@ -242,6 +408,10 @@ void ConstraintBuilder2D::ComputeConstraint(
   // Use the CSM estimate as both the initial and previous pose. This has the
   // effect that, in the absence of better information, we prefer the original
   // CSM estimate.
+ 
+  //okagv,test_landmark_relocalization
+  //return;
+
   ceres::Solver::Summary unused_summary;
   ceres_scan_matcher_.Match(pose_estimate.translation(), pose_estimate,
                             constant_data->filtered_gravity_aligned_point_cloud,
@@ -250,12 +420,23 @@ void ConstraintBuilder2D::ComputeConstraint(
 
   const transform::Rigid2d constraint_transform =
       ComputeSubmapPose(*submap).inverse() * pose_estimate;
+     
   constraint->reset(new Constraint{submap_id,
+                                   node_id,
+                                   {transform::Embed3D(constraint_transform),
+                                    options_.loop_closure_translation_weight(), //add * score by okagv
+                                    options_.loop_closure_rotation_weight() },
+                                   Constraint::INTER_SUBMAP});
+
+  //LOG(INFO) << "okagv add INTER_SUBMAP submap_id " << submap_id << " node_id " << node_id; 
+   /*
+   constraint->reset(new Constraint{submap_id,
                                    node_id,
                                    {transform::Embed3D(constraint_transform),
                                     options_.loop_closure_translation_weight(),
                                     options_.loop_closure_rotation_weight()},
                                    Constraint::INTER_SUBMAP});
+                                   */
 
   if (options_.log_matches()) {
     std::ostringstream info;
@@ -275,6 +456,37 @@ void ConstraintBuilder2D::ComputeConstraint(
     LOG(INFO) << info.str();
   }
 }
+
+  void ConstraintBuilder2D::GetMatchScore(double& score, bool& is_update)
+  {
+    absl::MutexLock locker(&mutex_);
+    is_update = is_score_update;
+    score = covariance_score_;
+    return;
+  }
+
+  void ConstraintBuilder2D::SetMatchScore(double& score) {
+    absl::MutexLock locker(&mutex_);
+    covariance_score_ = score;
+  }
+
+  void ConstraintBuilder2D::SetUpdateState(bool state)
+  {
+    is_score_update = state;
+  }
+
+  double ConstraintBuilder2D::GetRelocalizationMatchScore()
+  {
+    absl::MutexLock locker(&mutex_);
+    return relocalization_score_;
+  }
+
+  void ConstraintBuilder2D::SetRelocalizationMatchScore(double& score) {
+    absl::MutexLock locker(&mutex_);
+    relocalization_score_ = score;
+  }
+
+
 
 void ConstraintBuilder2D::RunWhenDoneCallback() {
   Result result;
@@ -307,11 +519,10 @@ int ConstraintBuilder2D::GetNumFinishedNodes() {
 void ConstraintBuilder2D::DeleteScanMatcher(const SubmapId& submap_id) {
   absl::MutexLock locker(&mutex_);
   if (when_done_) {
-    LOG(WARNING)
+    LOG(ERROR)
         << "DeleteScanMatcher was called while WhenDone was scheduled.";
   }
   submap_scan_matchers_.erase(submap_id);
-  per_submap_sampler_.erase(submap_id);
   kNumSubmapScanMatchersMetric->Set(submap_scan_matchers_.size());
 }
 
@@ -340,6 +551,133 @@ void ConstraintBuilder2D::RegisterMetrics(metrics::FamilyFactory* factory) {
       "mapping_constraints_constraint_builder_2d_num_submap_scan_matchers",
       "Current number of constructed submap scan matchers");
   kNumSubmapScanMatchersMetric = num_matchers->Add({});
+}
+
+    void ConstraintBuilder2D::ComputeConstraintForRelocalization(const SubmapId& submap_id, const Submap2D* submap,
+                         const NodeId& node_id, bool match_full_submap,
+                         const TrajectoryNode::Data* const constant_data,
+                         const transform::Rigid2d& initial_relative_pose,
+                         const SubmapScanMatcher& submap_scan_matcher,
+                         std::unique_ptr<Constraint>* constraint){
+ CHECK(submap_scan_matcher.fast_correlative_scan_matcher);
+  const transform::Rigid2d initial_pose =
+      ComputeSubmapPose(*submap) * initial_relative_pose;
+
+  // The 'constraint_transform' (submap i <- node j) is computed from:
+  // - a 'filtered_gravity_aligned_point_cloud' in node j,
+  // - the initial guess 'initial_pose' for (map <- node j),
+  // - the result 'pose_estimate' of Match() (map <- node j).
+  // - the ComputeSubmapPose() (map <- submap i)
+  float score = 0.;
+  transform::Rigid2d pose_estimate = transform::Rigid2d::Identity();
+
+  // Compute 'pose_estimate' in three stages:
+  // 1. Fast estimate using the fast correlative scan matcher.
+  // 2. Prune if the score is too low.
+  // 3. Refine.
+  if (match_full_submap) {
+    kGlobalConstraintsSearchedMetric->Increment();
+    if (submap_scan_matcher.fast_correlative_scan_matcher->MatchFullSubmap(
+            constant_data->filtered_gravity_aligned_point_cloud,
+            options_.global_localization_min_score(), &score, &pose_estimate)) {
+      CHECK_GT(score, options_.global_localization_min_score());
+      CHECK_GE(node_id.trajectory_id, 0);
+      CHECK_GE(submap_id.trajectory_id, 0);
+      kGlobalConstraintsFoundMetric->Increment();
+      kGlobalConstraintScoresMetric->Observe(score);
+    } else {
+      return;
+    }
+  } else {
+    kConstraintsSearchedMetric->Increment();
+    if (submap_scan_matcher.fast_correlative_scan_matcher->MatchForRelocalization(
+            initial_pose, constant_data->filtered_gravity_aligned_point_cloud,
+            options_.min_score(), &score, &pose_estimate)) {
+      //LOG(INFO) << "okagv submap_id trajectory_id: " << submap_id.trajectory_id << " submap_id submap_index: " << submap_id.submap_index;
+      //LOG(INFO) << "okagv node_id trajectory_id: " << node_id.trajectory_id << " node_id node_index: " << node_id.node_index;
+      LOG(INFO) << "okagv Relocalization local score: " << score;
+      //LOG(INFO) << "okagv initial_pose x : " << initial_pose.translation()(0,0);
+      //LOG(INFO) << "okagv initial_pose y : " << initial_pose.translation()(1,0);
+      //LOG(INFO) << "okagv initial_pose angle : " << initial_pose.rotation().angle() * 180.0 / 3.1415926;
+      //LOG(INFO) << "okagv pose_estimate x : " << pose_estimate.translation()(0,0);
+      //LOG(INFO) << "okagv pose_estimate y : " << pose_estimate.translation()(1,0);
+      //LOG(INFO) << "okagv pose_estimate angle : " << pose_estimate.rotation().angle() * 180.0 / 3.1415926;
+      //LOG(INFO) << "---------------------------------------------------------------------------------------";
+
+      // We've reported a successful local match.
+      CHECK_GT(score, options_.min_score());
+      kConstraintsFoundMetric->Increment();
+      kConstraintScoresMetric->Observe(score);
+    } else {
+      return;
+    }
+
+    //okagv
+    if(node_id.trajectory_id == 1001 &&
+       (node_id.trajectory_id != submap_id.trajectory_id))
+    {
+        relocalization_score_ = score;
+        covariance_score_ = score;
+        //LOG(INFO) << "okagv local covariance_score_: " << covariance_score_;
+    }
+
+  }
+  {
+    absl::MutexLock locker(&mutex_);
+    score_histogram_.Add(score);
+  }
+
+  // Use the CSM estimate as both the initial and previous pose. This has the
+  // effect that, in the absence of better information, we prefer the original
+  // CSM estimate.
+  ceres::Solver::Summary unused_summary;
+  ceres_scan_matcher_.Match(pose_estimate.translation(), pose_estimate,
+                            constant_data->filtered_gravity_aligned_point_cloud,
+                            *submap_scan_matcher.grid, &pose_estimate,
+                            &unused_summary);
+
+  const transform::Rigid2d constraint_transform =
+      ComputeSubmapPose(*submap).inverse() * pose_estimate;
+     
+  constraint->reset(new Constraint{submap_id,
+                                   node_id,
+                                   {transform::Embed3D(constraint_transform),
+                                    options_.loop_closure_translation_weight() * score, //add * score by okagv
+                                    options_.loop_closure_rotation_weight() * score},
+                                   Constraint::INTER_SUBMAP});
+   /*
+   constraint->reset(new Constraint{submap_id,
+                                   node_id,
+                                   {transform::Embed3D(constraint_transform),
+                                    options_.loop_closure_translation_weight(),
+                                    options_.loop_closure_rotation_weight()},
+                                   Constraint::INTER_SUBMAP});
+                                   */
+
+  if (options_.log_matches()) {
+    std::ostringstream info;
+    info << "Node " << node_id << " with "
+         << constant_data->filtered_gravity_aligned_point_cloud.size()
+         << " points on submap " << submap_id << std::fixed;
+    if (match_full_submap) {
+      info << " matches";
+    } else {
+      const transform::Rigid2d difference =
+          initial_pose.inverse() * pose_estimate;
+      info << " differs by translation " << std::setprecision(2)
+           << difference.translation().norm() << " rotation "
+           << std::setprecision(3) << std::abs(difference.normalized_angle());
+    }
+    info << " with score " << std::setprecision(1) << 100. * score << "%.";
+    LOG(INFO) << info.str();
+  }
+
+}
+
+void ConstraintBuilder2D::SetConstraintBuilderOptions(
+    constraints::proto::ConstraintBuilderOptions& options_reset) {
+  options_ = options_reset;
+  //LOG(INFO) << "okagv SetConstraintBuilderOptions min_score " << options_.min_score();
 }
 
 }  // namespace constraints

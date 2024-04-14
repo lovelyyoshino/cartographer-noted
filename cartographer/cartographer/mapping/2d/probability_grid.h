@@ -57,6 +57,7 @@ class ProbabilityGrid : public Grid2D {
 
   proto::Grid2D ToProto() const override;
   std::unique_ptr<Grid2D> ComputeCroppedGrid() const override;
+
   bool DrawToSubmapTexture(
       proto::SubmapQuery::Response::SubmapTexture* const texture,
       transform::Rigid3d local_pose) const override;

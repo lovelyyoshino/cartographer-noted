@@ -18,8 +18,8 @@
 
 #include <string>
 
-#include "cartographer/common/internal/testing/lua_parameter_dictionary_test_helpers.h"
 #include "cartographer/common/lua_parameter_dictionary.h"
+#include "cartographer/common/lua_parameter_dictionary_test_helpers.h"
 #include "cartographer/common/port.h"
 #include "cartographer/io/fake_file_writer.h"
 #include "cartographer/io/points_processor_pipeline_builder.h"
@@ -85,9 +85,8 @@ std::vector<char> CreateExpectedProbabilityGrid(
   mapping::ValueConversionTables conversion_tables;
   auto probability_grid = CreateProbabilityGrid(
       probability_grid_options->GetDouble("resolution"), &conversion_tables);
-  range_data_inserter.Insert(
-      {points_batch->origin, sensor::PointCloud(points_batch->points), {}},
-      &probability_grid);
+  range_data_inserter.Insert({points_batch->origin, points_batch->points, {}},
+                             &probability_grid);
 
   std::vector<char> probability_grid_proto(
       probability_grid.ToProto().ByteSize());

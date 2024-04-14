@@ -36,7 +36,7 @@ using uint32 = uint32_t;
 using uint64 = uint64_t;
 
 namespace common {
-// lround取整数 往绝对值大的方向取
+
 inline int RoundToInt(const float x) { return std::lround(x); }
 
 inline int RoundToInt(const double x) { return std::lround(x); }

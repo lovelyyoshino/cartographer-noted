@@ -37,6 +37,7 @@ class OverlappingSubmapsTrimmer2D : public PoseGraphTrimmer {
 
   void Trim(Trimmable* pose_graph) override;
   bool IsFinished() override { return finished_; }
+  void CheckRemovedSubmapId(Trimmable* pose_graph) override;
 
  private:
   // Number of the most recent submaps to keep.
@@ -49,6 +50,12 @@ class OverlappingSubmapsTrimmer2D : public PoseGraphTrimmer {
   uint16 current_submap_count_ = 0;
 
   bool finished_ = false;
+
+  //okagv
+  std::vector<SubmapId> submap_ids_to_remove;
+
+  //okagv 
+  uint16 init_submap_count_ = 0;
 };
 
 }  // namespace mapping

@@ -41,45 +41,38 @@ struct TrajectoryNodePose {
   absl::optional<ConstantPoseData> constant_pose_data;
 };
 
-struct TrajectoryNode {     //时间 　旋转矩阵　点云数据　　局部ｓｌａｍ位姿
+struct TrajectoryNode {
   struct Data {
     common::Time time;
 
     // Transform to approximately gravity align the tracking frame as
     // determined by local SLAM.
-    Eigen::Quaterniond gravity_alignment;　　　                     
-    // 一个表示旋转矩阵的四元数。该旋转矩阵将非水平面的传感器数据投射到水平面上
-     // 利用IMU的重力传感器可计算出该旋转矩阵 为雷达与水平方向的俯仰夹角，用于在水平方向进行投影
+    Eigen::Quaterniond gravity_alignment;
 
     // Used for loop closure in 2D: voxel filtered returns in the
     // 'gravity_alignment' frame.
-    sensor::PointCloud filtered_gravity_aligned_point_cloud;　    　
-    //经过水平投射后的点云数据，可用于2D情况下做Loop Closure.
+    sensor::PointCloud filtered_gravity_aligned_point_cloud;
 
     // Used for loop closure in 3D.
-    sensor::PointCloud high_resolution_point_cloud;                
-    //高分辨率点云数据
-    sensor::PointCloud low_resolution_point_cloud;                 
-    //低分辨率点云数据 
-    Eigen::VectorXf rotational_scan_matcher_histogram;            
-     //旋转匹配直方图   VectorXf是一个长度可变的向量。
- 
+    sensor::PointCloud high_resolution_point_cloud;
+    sensor::PointCloud low_resolution_point_cloud;
+    Eigen::VectorXf rotational_scan_matcher_histogram;
+
     // The node pose in the local SLAM frame.
-    transform::Rigid3d local_pose;                                  
-    //节点在Local 子图中的Pose
+    transform::Rigid3d local_pose;
   };
 
-  common::Time time() const { return constant_data->time; }     //返回data时间
+  common::Time time() const { return constant_data->time; }
 
   // This must be a shared_ptr. If the data is used for visualization while the
   // node is being trimmed, it must survive until all use finishes.
-  std::shared_ptr<const Data> constant_data;　　　　　　　　　　　//创建了一个Data结构体,
+  std::shared_ptr<const Data> constant_data;
 
   // The node pose in the global SLAM frame.
-  transform::Rigid3d global_pose;                                //节点在全局 SLAM中的Pose
+  transform::Rigid3d global_pose;
 };
 
-proto::TrajectoryNodeData ToProto(const TrajectoryNode::Data& constant_data);      //将:Data 结构体数据进行序列化
+proto::TrajectoryNodeData ToProto(const TrajectoryNode::Data& constant_data);
 TrajectoryNode::Data FromProto(const proto::TrajectoryNodeData& proto);
 
 }  // namespace mapping

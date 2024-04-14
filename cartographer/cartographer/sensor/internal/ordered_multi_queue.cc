@@ -175,5 +175,17 @@ common::Time OrderedMultiQueue::GetCommonStartTime(const int trajectory_id) {
   return common_start_time;
 }
 
+  //okagv
+  void OrderedMultiQueue::DeleteQueue(QueueKey& queue_key)
+  {
+      auto it = queues_.find(queue_key);
+      CHECK(it != queues_.end()) << "Did not find '" << queue_key << "'.";
+      queues_.erase(it->first);
+      //auto& queue = it->second;
+      //CHECK(!queue.finished);
+      //queue.finished = true;
+      //Dispatch();
+  }
+
 }  // namespace sensor
 }  // namespace cartographer

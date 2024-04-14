@@ -34,7 +34,6 @@ class MockPoseGraph : public mapping::PoseGraphInterface {
   MOCK_METHOD0(RunFinalOptimization, void());
   MOCK_CONST_METHOD0(GetAllSubmapData,
                      mapping::MapById<mapping::SubmapId, SubmapData>());
-  MOCK_CONST_METHOD1(GetSubmapData, SubmapData(const SubmapId&));
   MOCK_CONST_METHOD0(GetAllSubmapPoses,
                      mapping::MapById<mapping::SubmapId, SubmapPose>());
   MOCK_CONST_METHOD1(GetLocalToGlobalTransform, transform::Rigid3d(int));
@@ -61,6 +60,60 @@ class MockPoseGraph : public mapping::PoseGraphInterface {
   MOCK_CONST_METHOD1(ToProto, mapping::proto::PoseGraph(bool));
   MOCK_METHOD1(SetGlobalSlamOptimizationCallback,
                void(GlobalSlamOptimizationCallback callback));
+
+  MOCK_CONST_METHOD0(GetOKagv_Order, mapping::PoseGraphInterface::OKagvOrder());
+
+  MOCK_METHOD1(SetOKagv_Order,
+               void(const mapping::PoseGraphInterface::OKagvOrder&));
+
+  MOCK_CONST_METHOD0(GetOKagv_Feedback, mapping::PoseGraphInterface::OKagvFeedback());
+
+  MOCK_METHOD1(SetOKagv_Feedback,
+               void(const mapping::PoseGraphInterface::OKagvFeedback&));
+
+  MOCK_CONST_METHOD1(IsTrajectoryExist, bool(int));
+
+  MOCK_METHOD2(GetCovarianceScore, void(double&, bool&));
+
+  MOCK_METHOD2(SetTrajectoryState, void(int, mapping::PoseGraphInterface::TrajectoryState));
+
+  MOCK_METHOD3(LocalizeOKagvPoses, bool(const bool, const int, const transform::Rigid3d));
+
+  MOCK_METHOD1(SetWorkingTrajectoryType, void(uint8_t));
+
+  MOCK_METHOD0(GetWorkingTrajectoryType, uint8_t());
+
+  MOCK_METHOD1(SetCovarianceScore, void(double));
+  MOCK_METHOD1(SetConstraintBuilderMinScore, void(double));
+  MOCK_CONST_METHOD0(constraintsWithId, std::vector<Constraint>(int));
+
+  MOCK_CONST_METHOD1(GetLandmarkPosesWithId,
+                     std::map<std::string, transform::Rigid3d>(int));
+
+  MOCK_CONST_METHOD0(GetAllSubmapDataAfterUpdate,
+                     mapping::MapById<mapping::SubmapId, SubmapData>());
+  MOCK_CONST_METHOD0(
+      GetTrajectoryNodesAfterUpdate,
+      mapping::MapById<mapping::NodeId, mapping::TrajectoryNode>());
+  MOCK_CONST_METHOD0(
+      GetTrajectoryDataAfterUpdate,
+      std::map<int, mapping::PoseGraphInterface::TrajectoryData>());
+  MOCK_CONST_METHOD0(constraintsAfterUpdate, std::vector<Constraint>());
+
+  MOCK_CONST_METHOD0(GetLandmarkPosesAfterUpdate,
+                     std::map<std::string, transform::Rigid3d>());
+
+  MOCK_METHOD0(StopDrainWorkQueue, void());
+
+  MOCK_METHOD0(StartDrainWorkQueue, void());
+
+  MOCK_METHOD1(SetThreadPoolState,
+               void(mapping::PoseGraphInterface::ThreadPoolState));
+
+  MOCK_METHOD0(GetThreadPoolState,
+               mapping::PoseGraphInterface::ThreadPoolState());
+
+  MOCK_METHOD1(SetPoseGraphOption, void(mapping::proto::PoseGraphOptions&));
 };
 
 }  // namespace testing

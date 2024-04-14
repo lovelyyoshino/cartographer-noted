@@ -45,22 +45,14 @@ class LocalTrajectoryBuilder2D {
  public:
   struct InsertionResult {
     std::shared_ptr<const TrajectoryNode::Data> constant_data;
-    //点云匹配后节点数据
     std::vector<std::shared_ptr<const Submap2D>> insertion_submaps;
-    //插入子图的vector 数据  更新后的子图列表
   };
-  // matching结果。包括时间、匹配的local_pose、激光测距数据、插入结果等
   struct MatchingResult {
-    common::Time time;                                         
-    //时间戳
+    common::Time time;
     transform::Rigid3d local_pose;
-    //在子图中的位置
     sensor::RangeData range_data_in_local;
-    //本帧的点云
-
     // 'nullptr' if dropped by the motion filter.
-    std::unique_ptr<const InsertionResult> insertion_result; //包括点云 子图序列
-    //可能因为运动滤波器滤掉后返回空指针
+    std::unique_ptr<const InsertionResult> insertion_result;
   };
 
   explicit LocalTrajectoryBuilder2D(
@@ -77,27 +69,26 @@ class LocalTrajectoryBuilder2D {
   // `range_data` was acquired, `TimedPointCloudData::ranges` contains the
   // relative time of point with respect to `TimedPointCloudData::time`.
   std::unique_ptr<MatchingResult> AddRangeData(
-                                            const std::string& sensor_id,
-                                            const sensor::TimedPointCloudData& range_data);
+      const std::string& sensor_id,
+      const sensor::TimedPointCloudData& range_data);
   void AddImuData(const sensor::ImuData& imu_data);
   void AddOdometryData(const sensor::OdometryData& odometry_data);
 
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
 
+    //okagv
+  void ClearOldData();
+
  private:
   std::unique_ptr<MatchingResult> AddAccumulatedRangeData(
-      common::Time time, 
-      const sensor::RangeData& gravity_aligned_range_data,
+      common::Time time, const sensor::RangeData& gravity_aligned_range_data,
       const transform::Rigid3d& gravity_alignment,
       const absl::optional<common::Duration>& sensor_duration);
-
   sensor::RangeData TransformToGravityAlignedFrameAndFilter(
       const transform::Rigid3f& transform_to_gravity_aligned_frame,
       const sensor::RangeData& range_data) const;
-
   std::unique_ptr<InsertionResult> InsertIntoSubmap(
-      common::Time time, 
-      const sensor::RangeData& range_data_in_local,
+      common::Time time, const sensor::RangeData& range_data_in_local,
       const sensor::PointCloud& filtered_gravity_aligned_point_cloud,
       const transform::Rigid3d& pose_estimate,
       const Eigen::Quaterniond& gravity_alignment);
@@ -111,32 +102,27 @@ class LocalTrajectoryBuilder2D {
   // Lazily constructs a PoseExtrapolator.
   void InitializeExtrapolator(common::Time time);
 
-  const proto::LocalTrajectoryBuilderOptions2D options_;           
-  // 轨迹跟踪器的配置信息
-  ActiveSubmaps2D active_submaps_;                                 
-  // 维护正在使用的submap,已分析过，包括栅格地图类型，插入，更新
+  const proto::LocalTrajectoryBuilderOptions2D options_;
+  ActiveSubmaps2D active_submaps_;
 
-  MotionFilter motion_filter_;                                     
-  // 运动滤波器，用来对运动pose进行降采样
+  MotionFilter motion_filter_;
   scan_matching::RealTimeCorrelativeScanMatcher2D
-      real_time_correlative_scan_matcher_;                         
-      // 相关匹配器 
-  scan_matching::CeresScanMatcher2D ceres_scan_matcher_;           
-  // 优化匹配器， 
+      real_time_correlative_scan_matcher_;
+  scan_matching::CeresScanMatcher2D ceres_scan_matcher_;
 
-  std::unique_ptr<PoseExtrapolator> extrapolator_;                 
-  // 位置估计器，可根据历史轨迹及其传感器估计下时刻位置
+  std::unique_ptr<PoseExtrapolator> extrapolator_;
 
   int num_accumulated_ = 0;
-  sensor::RangeData accumulated_range_data_;                      
-   // 预处理后激光点云，也包含激光原点origin坐标，即经过融合，矫正等操作
+  sensor::RangeData accumulated_range_data_;
 
   absl::optional<std::chrono::steady_clock::time_point> last_wall_time_;
   absl::optional<double> last_thread_cpu_time_seconds_;
-  absl::optional<common::Time> last_sensor_time_;                  
-  //激光数据收集器,击中激光按照按照时间戳融合
+  absl::optional<common::Time> last_sensor_time_;
 
-  RangeDataCollator range_data_collator_;//传感器数据收集器
+  RangeDataCollator range_data_collator_;
+
+  //okagv
+  common::Time last_match_time_ = common::Time::min();
 };
 
 }  // namespace mapping

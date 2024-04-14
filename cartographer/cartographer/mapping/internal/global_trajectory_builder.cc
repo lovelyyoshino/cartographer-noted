@@ -19,10 +19,8 @@
 #include <memory>
 
 #include "absl/memory/memory.h"
-#include "absl/types/optional.h"
 #include "cartographer/common/time.h"
-#include "cartographer/mapping/internal/local_slam_result_data.h"
-#include "cartographer/mapping/internal/motion_filter.h"
+#include "cartographer/mapping/local_slam_result_data.h"
 #include "cartographer/metrics/family_factory.h"
 #include "glog/logging.h"
 
@@ -41,13 +39,11 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
   GlobalTrajectoryBuilder(
       std::unique_ptr<LocalTrajectoryBuilder> local_trajectory_builder,
       const int trajectory_id, PoseGraph* const pose_graph,
-      const LocalSlamResultCallback& local_slam_result_callback,
-      const absl::optional<MotionFilter>& pose_graph_odometry_motion_filter)
+      const LocalSlamResultCallback& local_slam_result_callback)
       : trajectory_id_(trajectory_id),
         pose_graph_(pose_graph),
         local_trajectory_builder_(std::move(local_trajectory_builder)),
-        local_slam_result_callback_(local_slam_result_callback),
-        pose_graph_odometry_motion_filter_(pose_graph_odometry_motion_filter) {}
+        local_slam_result_callback_(local_slam_result_callback) {}
   ~GlobalTrajectoryBuilder() override {}
 
   GlobalTrajectoryBuilder(const GlobalTrajectoryBuilder&) = delete;
@@ -56,6 +52,7 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
   void AddSensorData(
       const std::string& sensor_id,
       const sensor::TimedPointCloudData& timed_point_cloud_data) override {
+
     CHECK(local_trajectory_builder_)
         << "Cannot add TimedPointCloudData without a LocalTrajectoryBuilder.";
     std::unique_ptr<typename LocalTrajectoryBuilder::MatchingResult>
@@ -63,22 +60,39 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
             sensor_id, timed_point_cloud_data);
     if (matching_result == nullptr) {
       // The range data has not been fully accumulated yet.
-      return;
+      //LOG(INFO) << "okagv matching_result is nullptr";
+        return;
     }
+    
+    //okagv
+    
+    if(matching_result->range_data_in_local.returns.size() < 100)
+    {
+      pose_graph_->SetCovarianceScore(0.0);
+    }
+    
     kLocalSlamMatchingResults->Increment();
     std::unique_ptr<InsertionResult> insertion_result;
     if (matching_result->insertion_result != nullptr) {
       kLocalSlamInsertionResults->Increment();
+
       auto node_id = pose_graph_->AddNode(
           matching_result->insertion_result->constant_data, trajectory_id_,
           matching_result->insertion_result->insertion_submaps);
       CHECK_EQ(node_id.trajectory_id, trajectory_id_);
+      
       insertion_result = absl::make_unique<InsertionResult>(InsertionResult{
           node_id, matching_result->insertion_result->constant_data,
           std::vector<std::shared_ptr<const Submap>>(
               matching_result->insertion_result->insertion_submaps.begin(),
               matching_result->insertion_result->insertion_submaps.end())});
     }
+    else
+    {
+      //LOG(INFO) << "okagv matching_result->insertion_result is nullptr";
+    }
+    
+
     if (local_slam_result_callback_) {
       local_slam_result_callback_(
           trajectory_id_, matching_result->time, matching_result->local_pose,
@@ -101,22 +115,14 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
     if (local_trajectory_builder_) {
       local_trajectory_builder_->AddOdometryData(odometry_data);
     }
-    // TODO(MichaelGrupp): Instead of having an optional filter on this level,
-    // odometry could be marginalized between nodes in the pose graph.
-    // Related issue: cartographer-project/cartographer/#1768
-    if (pose_graph_odometry_motion_filter_.has_value() &&
-        pose_graph_odometry_motion_filter_.value().IsSimilar(
-            odometry_data.time, odometry_data.pose)) {
-      return;
-    }
     pose_graph_->AddOdometryData(trajectory_id_, odometry_data);
   }
 
   void AddSensorData(
       const std::string& sensor_id,
-      const sensor::FixedFramePoseData& fixed_frame_pose) override {//包括时间、位姿信息
-    if (fixed_frame_pose.pose.has_value()) {//判断位姿有没有效
-      CHECK(fixed_frame_pose.pose.value().IsValid())//确定是不是固定位姿
+      const sensor::FixedFramePoseData& fixed_frame_pose) override {
+    if (fixed_frame_pose.pose.has_value()) {
+      CHECK(fixed_frame_pose.pose.value().IsValid())
           << fixed_frame_pose.pose.value();
     }
     pose_graph_->AddFixedFramePoseData(trajectory_id_, fixed_frame_pose);
@@ -139,7 +145,6 @@ class GlobalTrajectoryBuilder : public mapping::TrajectoryBuilderInterface {
   PoseGraph* const pose_graph_;
   std::unique_ptr<LocalTrajectoryBuilder> local_trajectory_builder_;
   LocalSlamResultCallback local_slam_result_callback_;
-  absl::optional<MotionFilter> pose_graph_odometry_motion_filter_;
 };
 
 }  // namespace
@@ -148,28 +153,22 @@ std::unique_ptr<TrajectoryBuilderInterface> CreateGlobalTrajectoryBuilder2D(
     std::unique_ptr<LocalTrajectoryBuilder2D> local_trajectory_builder,
     const int trajectory_id, mapping::PoseGraph2D* const pose_graph,
     const TrajectoryBuilderInterface::LocalSlamResultCallback&
-        local_slam_result_callback,
-    const absl::optional<MotionFilter>& pose_graph_odometry_motion_filter) {
+        local_slam_result_callback) {
   return absl::make_unique<
       GlobalTrajectoryBuilder<LocalTrajectoryBuilder2D, mapping::PoseGraph2D>>(
       std::move(local_trajectory_builder), trajectory_id, pose_graph,
-      local_slam_result_callback, pose_graph_odometry_motion_filter);
+      local_slam_result_callback);
 }
 
 std::unique_ptr<TrajectoryBuilderInterface> CreateGlobalTrajectoryBuilder3D(
     std::unique_ptr<LocalTrajectoryBuilder3D> local_trajectory_builder,
-    const int trajectory_id,
-    mapping::PoseGraph3D* const pose_graph,
-    const TrajectoryBuilderInterface::LocalSlamResultCallback& local_slam_result_callback,
-    const absl::optional<MotionFilter>& pose_graph_odometry_motion_filter) 
-{
+    const int trajectory_id, mapping::PoseGraph3D* const pose_graph,
+    const TrajectoryBuilderInterface::LocalSlamResultCallback&
+        local_slam_result_callback) {
   return absl::make_unique<
       GlobalTrajectoryBuilder<LocalTrajectoryBuilder3D, mapping::PoseGraph3D>>(
-                                                              std::move(local_trajectory_builder), 
-                                                              trajectory_id,
-                                                              pose_graph,
-                                                              local_slam_result_callback,
-                                                              pose_graph_odometry_motion_filter);
+      std::move(local_trajectory_builder), trajectory_id, pose_graph,
+      local_slam_result_callback);
 }
 
 void GlobalTrajectoryBuilderRegisterMetrics(metrics::FamilyFactory* factory) {

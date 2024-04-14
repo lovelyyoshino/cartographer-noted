@@ -77,7 +77,6 @@ if(NOT GMock_FOUND)
           EXCLUDE_FROM_ALL)
       endif()
       set(GMOCK_LIBRARIES gmock_main)
-      set(GMOCK_INCLUDE_DIRS ${GMOCK_SRC_DIR}/include)
     endif()
   endif()
 

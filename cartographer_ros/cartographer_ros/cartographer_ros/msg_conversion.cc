@@ -129,7 +129,6 @@ float GetFirstEcho(const sensor_msgs::LaserEcho& echo) {
 }
 
 // For sensor_msgs::LaserScan and sensor_msgs::MultiEchoLaserScan.
-// 返回有效点云信息和时间戳
 template <typename LaserMessageType>
 std::tuple<PointCloudWithIntensities, ::cartographer::common::Time>
 LaserScanToPointCloudWithIntensities(const LaserMessageType& msg) {
@@ -141,16 +140,24 @@ LaserScanToPointCloudWithIntensities(const LaserMessageType& msg) {
     CHECK_GT(msg.angle_min, msg.angle_max);
   }
   PointCloudWithIntensities point_cloud;
-  float angle = msg.angle_min;
-  for (size_t i = 0; i < msg.ranges.size(); ++i) {
+  float angle = msg.angle_min; //  float angle = msg.angle_min ;
+  for (size_t i = 0; i < msg.ranges.size(); ++i) {  //Peak.ding default is for (size_t i = 0; i < msg.ranges.size(); ++i)
     const auto& echoes = msg.ranges[i];
-    if (HasEcho(echoes)) {                                    //如果激光数据不为空 ，按照时间存储点云信息
+
+    //peak.ding
+    // if(i < 1* msg.ranges.size()/4 || i > 3* msg.ranges.size()/4)
+    // {
+    //    angle += msg.angle_increment; //Peak.ding default is angle += msg.angle_increment
+    //    continue;
+    // }
+
+    if (HasEcho(echoes)) {
       const float first_echo = GetFirstEcho(echoes);
       if (msg.range_min <= first_echo && first_echo <= msg.range_max) {
-        const Eigen::AngleAxisf rotation(angle, Eigen::Vector3f::UnitZ());  //欧拉角Z轴
+        const Eigen::AngleAxisf rotation(angle, Eigen::Vector3f::UnitZ());
         const cartographer::sensor::TimedRangefinderPoint point{
-            rotation * (first_echo * Eigen::Vector3f::UnitX()),        //
-            i * msg.time_increment};                                   //时间增量排序
+            rotation * (first_echo * Eigen::Vector3f::UnitX()),
+            i * msg.time_increment};
         point_cloud.points.push_back(point);
         if (msg.intensities.size() > 0) {
           CHECK_EQ(msg.intensities.size(), msg.ranges.size());
@@ -162,7 +169,7 @@ LaserScanToPointCloudWithIntensities(const LaserMessageType& msg) {
         }
       }
     }
-    angle += msg.angle_increment;
+    angle += msg.angle_increment; //Peak.ding default is angle += msg.angle_increment
   }
   ::cartographer::common::Time timestamp = FromRos(msg.header.stamp);
   if (!point_cloud.points.empty()) {
@@ -172,7 +179,7 @@ LaserScanToPointCloudWithIntensities(const LaserMessageType& msg) {
       point.time -= duration;
     }
   }
-  return std::make_tuple(point_cloud, timestamp); //返回结构体 时间戳和点云集
+  return std::make_tuple(point_cloud, timestamp);
 }
 
 bool PointCloud2HasField(const sensor_msgs::PointCloud2& pc2,
@@ -204,7 +211,7 @@ sensor_msgs::PointCloud2 ToPointCloud2Message(
 std::tuple<::cartographer::sensor::PointCloudWithIntensities,
            ::cartographer::common::Time>
 ToPointCloudWithIntensities(const sensor_msgs::LaserScan& msg) {
-  return LaserScanToPointCloudWithIntensities(msg);   //获取 有效点云信息和时间戳
+  return LaserScanToPointCloudWithIntensities(msg);
 }
 
 std::tuple<::cartographer::sensor::PointCloudWithIntensities,
@@ -282,10 +289,21 @@ ToPointCloudWithIntensities(const sensor_msgs::PointCloud2& msg) {
 LandmarkData ToLandmarkData(const LandmarkList& landmark_list) {
   LandmarkData landmark_data;
   landmark_data.time = FromRos(landmark_list.header.stamp);
+  /*
   for (const LandmarkEntry& entry : landmark_list.landmarks) {
     landmark_data.landmark_observations.push_back(
         {entry.id, ToRigid3d(entry.tracking_from_landmark_transform),
          entry.translation_weight, entry.rotation_weight});
+  }
+  */
+
+  //okagv
+    for (const LandmarkEntry& entry : landmark_list.landmarks) {
+    landmark_data.landmark_observations.push_back(
+        {entry.id, ToRigid3d(entry.tracking_from_landmark_transform),
+         entry.translation_weight, entry.rotation_weight, entry.type});
+         //LOG(INFO) << "Peak.ding find x " << entry.tracking_from_landmark_transform.position.x;
+         //LOG(INFO) << "Peak.ding find y " << entry.tracking_from_landmark_transform.position.y;
   }
   return landmark_data;
 }
@@ -328,6 +346,19 @@ geometry_msgs::Pose ToGeometryMsgPose(const Rigid3d& rigid3d) {
   pose.orientation.x = rigid3d.rotation().x();
   pose.orientation.y = rigid3d.rotation().y();
   pose.orientation.z = rigid3d.rotation().z();
+
+  //add by peak
+  /*
+  Eigen::Quaterniond quaternion(pose.orientation.w,
+                               pose.orientation.x,
+                               pose.orientation.y,
+                               pose.orientation.z);
+
+  Eigen::Vector3d eulerAngle = quaternion.matrix().eulerAngles(2,1,0);
+
+  pose.position.z = eulerAngle[0] * 180.0 / 3.1415926;
+  */
+
   return pose;
 }
 

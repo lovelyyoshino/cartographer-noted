@@ -87,6 +87,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 target_link_libraries(${PROJECT_NAME} PUBLIC cartographer)
 
+#okagv
+#target_link_libraries(${PROJECT_NAME} PUBLIC ${Abseil_LIBRARIES})
+
 # On windows, rviz won't find the DLL in CATKIN_PACKAGE_BIN_DESTINATION,
 # but it will in CATKIN_PACKAGE_LIB_DESTINATION?
 if(WIN32)

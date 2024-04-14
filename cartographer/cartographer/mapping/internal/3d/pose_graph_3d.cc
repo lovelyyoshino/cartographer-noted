@@ -793,7 +793,7 @@ void PoseGraph3D::AddSerializedConstraints(
       }
       data_.constraints.push_back(constraint);
     }
-    LOG(INFO) << "Loaded " << constraints.size() << " constraints.";
+    //LOG(INFO) << "Loaded " << constraints.size() << " constraints.";
     return WorkItem::Result::kDoNotRunOptimization;
   });
 }
@@ -938,6 +938,11 @@ MapById<NodeId, TrajectoryNode> PoseGraph3D::GetTrajectoryNodes() const {
   return data_.trajectory_nodes;
 }
 
+MapById<NodeId, TrajectoryNode> PoseGraph3D::GetTrajectoryNodesAfterUpdate() const {
+  absl::MutexLock locker(&mutex_);
+  return data_.trajectory_nodes;
+}
+
 MapById<NodeId, TrajectoryNodePose> PoseGraph3D::GetTrajectoryNodePoses()
     const {
   MapById<NodeId, TrajectoryNodePose> node_poses;
@@ -966,7 +971,58 @@ PoseGraph3D::GetTrajectoryStates() const {
   return trajectories_state;
 }
 
+PoseGraphInterface::OKagvOrder
+PoseGraph3D::GetOKagv_Order() const {
+    return current_okagv_order_;
+}
+
+void PoseGraph3D::SetOKagv_Order(const OKagvOrder& order)
+{
+    current_okagv_order_ = order;
+}
+
+PoseGraphInterface::OKagvFeedback PoseGraph3D::GetOKagv_Feedback() const {
+  return current_okagv_feedback_;
+}
+
+void PoseGraph3D::SetOKagv_Feedback(const OKagvFeedback& feedback) {
+  current_okagv_feedback_ = feedback;
+}
+
+bool PoseGraph3D::LocalizeOKagvPoses(const bool use_initial_pose,
+                                     const int trajectory_id,
+                                     const transform::Rigid3d initial_pose) {
+  return true;
+}
+
 std::map<std::string, transform::Rigid3d> PoseGraph3D::GetLandmarkPoses()
+    const {
+  std::map<std::string, transform::Rigid3d> landmark_poses;
+  absl::MutexLock locker(&mutex_);
+  for (const auto& landmark : data_.landmark_nodes) {
+    // Landmark without value has not been optimized yet.
+    if (!landmark.second.global_landmark_pose.has_value()) continue;
+    landmark_poses[landmark.first] =
+        landmark.second.global_landmark_pose.value();
+  }
+  return landmark_poses;
+}
+
+// okagv
+std::map<std::string, transform::Rigid3d> PoseGraph3D::GetLandmarkPosesWithId(
+    int trajectory_id) const {
+  std::map<std::string, transform::Rigid3d> landmark_poses;
+  absl::MutexLock locker(&mutex_);
+  for (const auto& landmark : data_.landmark_nodes) {
+    // Landmark without value has not been optimized yet.
+    if (!landmark.second.global_landmark_pose.has_value()) continue;
+    landmark_poses[landmark.first] =
+        landmark.second.global_landmark_pose.value();
+  }
+  return landmark_poses;
+}
+
+std::map<std::string, transform::Rigid3d> PoseGraph3D::GetLandmarkPosesAfterUpdate()
     const {
   std::map<std::string, transform::Rigid3d> landmark_poses;
   absl::MutexLock locker(&mutex_);
@@ -995,6 +1051,11 @@ sensor::MapByTime<sensor::ImuData> PoseGraph3D::GetImuData() const {
   return optimization_problem_->imu_data();
 }
 
+sensor::MapByTime<sensor::ImuData> PoseGraph3D::GetImuDataAfterUpdate() const {
+  absl::MutexLock locker(&mutex_);
+  return optimization_problem_->imu_data();
+}
+
 sensor::MapByTime<sensor::OdometryData> PoseGraph3D::GetOdometryData() const {
   absl::MutexLock locker(&mutex_);
   return optimization_problem_->odometry_data();
@@ -1018,7 +1079,25 @@ PoseGraph3D::GetTrajectoryData() const {
   return optimization_problem_->trajectory_data();
 }
 
+std::map<int, PoseGraphInterface::TrajectoryData>
+PoseGraph3D::GetTrajectoryDataAfterUpdate() const {
+  absl::MutexLock locker(&mutex_);
+  return optimization_problem_->trajectory_data();
+}
+
 std::vector<PoseGraphInterface::Constraint> PoseGraph3D::constraints() const {
+  absl::MutexLock locker(&mutex_);
+  return data_.constraints;
+}
+
+  //okagv
+std::vector<PoseGraphInterface::Constraint> PoseGraph3D::constraintsWithId(int trajectory_id) const {
+  absl::MutexLock locker(&mutex_);
+  return data_.constraints;
+  }
+
+ //okagv
+  std::vector<PoseGraphInterface::Constraint> PoseGraph3D::constraintsAfterUpdate() const {
   absl::MutexLock locker(&mutex_);
   return data_.constraints;
 }
@@ -1073,6 +1152,12 @@ PoseGraphInterface::SubmapData PoseGraph3D::GetSubmapData(
 
 MapById<SubmapId, PoseGraphInterface::SubmapData>
 PoseGraph3D::GetAllSubmapData() const {
+  absl::MutexLock locker(&mutex_);
+  return GetSubmapDataUnderLock();
+}
+
+MapById<SubmapId, PoseGraphInterface::SubmapData>
+PoseGraph3D::GetAllSubmapDataAfterUpdate() const {
   absl::MutexLock locker(&mutex_);
   return GetSubmapDataUnderLock();
 }
@@ -1148,6 +1233,20 @@ std::vector<SubmapId> PoseGraph3D::TrimmingHandle::GetSubmapIds(
   }
   return submap_ids;
 }
+
+//okagv
+std::vector<NodeId> PoseGraph3D::TrimmingHandle::GetNodeIds(int trajectory_id) const {
+  std::vector<NodeId> node_ids;
+  const auto& node_data = parent_->optimization_problem_->node_data();
+  for (const auto& it : node_data.trajectory(trajectory_id)) {
+    node_ids.push_back(it.id);
+  }
+  return node_ids;
+}
+
+//okagv
+void PoseGraph3D::TrimmingHandle::TrimNode(const NodeId& node_id){}
+
 MapById<SubmapId, PoseGraphInterface::SubmapData>
 PoseGraph3D::TrimmingHandle::GetOptimizedSubmapData() const {
   MapById<SubmapId, PoseGraphInterface::SubmapData> submaps;
@@ -1190,69 +1289,42 @@ void PoseGraph3D::TrimmingHandle::TrimSubmap(const SubmapId& submap_id) {
   CHECK(parent_->data_.submap_data.at(submap_id).state ==
         SubmapState::kFinished);
 
-  // Compile all nodes that are still INTRA_SUBMAP constrained to other submaps
-  // once the submap with 'submap_id' is gone.
-  // We need to use node_ids instead of constraints here to be also compatible
-  // with frozen trajectories that don't have intra-constraints.
+  // Compile all nodes that are still INTRA_SUBMAP constrained once the submap
+  // with 'submap_id' is gone.
   std::set<NodeId> nodes_to_retain;
-  for (const auto& submap_data : parent_->data_.submap_data) {
-    if (submap_data.id != submap_id) {
-      nodes_to_retain.insert(submap_data.data.node_ids.begin(),
-                             submap_data.data.node_ids.end());
+  for (const Constraint& constraint : parent_->data_.constraints) {
+    if (constraint.tag == Constraint::Tag::INTRA_SUBMAP &&
+        constraint.submap_id != submap_id) {
+      nodes_to_retain.insert(constraint.node_id);
     }
   }
-
-  // Remove all nodes that are exlusively associated to 'submap_id'.
-  std::set<NodeId> nodes_to_remove;
-  std::set_difference(parent_->data_.submap_data.at(submap_id).node_ids.begin(),
-                      parent_->data_.submap_data.at(submap_id).node_ids.end(),
-                      nodes_to_retain.begin(), nodes_to_retain.end(),
-                      std::inserter(nodes_to_remove, nodes_to_remove.begin()));
-
   // Remove all 'data_.constraints' related to 'submap_id'.
+  std::set<NodeId> nodes_to_remove;
   {
     std::vector<Constraint> constraints;
     for (const Constraint& constraint : parent_->data_.constraints) {
-      if (constraint.submap_id != submap_id) {
+      if (constraint.submap_id == submap_id) {
+        if (constraint.tag == Constraint::Tag::INTRA_SUBMAP &&
+            nodes_to_retain.count(constraint.node_id) == 0) {
+          // This node will no longer be INTRA_SUBMAP contrained and has to be
+          // removed.
+          nodes_to_remove.insert(constraint.node_id);
+        }
+      } else {
         constraints.push_back(constraint);
       }
     }
     parent_->data_.constraints = std::move(constraints);
   }
-
   // Remove all 'data_.constraints' related to 'nodes_to_remove'.
-  // If the removal lets other submaps lose all their inter-submap constraints,
-  // delete their corresponding constraint submap matchers to save memory.
   {
     std::vector<Constraint> constraints;
-    std::set<SubmapId> other_submap_ids_losing_constraints;
     for (const Constraint& constraint : parent_->data_.constraints) {
       if (nodes_to_remove.count(constraint.node_id) == 0) {
         constraints.push_back(constraint);
-      } else {
-        // A constraint to another submap will be removed, mark it as affected.
-        other_submap_ids_losing_constraints.insert(constraint.submap_id);
       }
     }
     parent_->data_.constraints = std::move(constraints);
-    // Go through the remaining constraints to ensure we only delete scan
-    // matchers of other submaps that have no inter-submap constraints left.
-    for (const Constraint& constraint : parent_->data_.constraints) {
-      if (constraint.tag == Constraint::Tag::INTRA_SUBMAP) {
-        continue;
-      } else if (other_submap_ids_losing_constraints.count(
-                     constraint.submap_id)) {
-        // This submap still has inter-submap constraints - ignore it.
-        other_submap_ids_losing_constraints.erase(constraint.submap_id);
-      }
-    }
-    // Delete scan matchers of the submaps that lost all constraints.
-    // TODO(wohe): An improvement to this implementation would be to add the
-    // caching logic at the constraint builder which could keep around only
-    // recently used scan matchers.
-    for (const SubmapId& submap_id : other_submap_ids_losing_constraints) {
-      parent_->constraint_builder_.DeleteScanMatcher(submap_id);
-    }
   }
 
   // Mark the submap with 'submap_id' as trimmed and remove its data.
@@ -1314,6 +1386,60 @@ void PoseGraph3D::RegisterMetrics(metrics::FamilyFactory* family_factory) {
   kActiveSubmapsMetric = submaps->Add({{"state", "active"}});
   kFrozenSubmapsMetric = submaps->Add({{"state", "frozen"}});
   kDeletedSubmapsMetric = submaps->Add({{"state", "deleted"}});
+}
+
+// okagv
+bool PoseGraph3D::IsTrajectoryExist(int trajectory_id) const {
+  absl::MutexLock locker(&mutex_);
+  auto it = data_.trajectories_state.find(trajectory_id);
+  if (it == data_.trajectories_state.end()) {
+    LOG(INFO) << "Find non-existing trajectory_id: "
+                 << trajectory_id;
+    return false;
+  }
+  else
+  {
+    return true;
+  }
+  
+}
+
+// okagv
+void PoseGraph3D::GetCovarianceScore(double& score, bool& is_update) { return; }
+
+// okagv
+void PoseGraph3D::SetCovarianceScore(double score) {
+  covariance_score_ = score;
+}
+
+// okagv
+void PoseGraph3D::SetTrajectoryState(int trajectory_id, TrajectoryState state) {
+  return;
+}
+
+// okagv
+void PoseGraph3D::SetWorkingTrajectoryType(uint8_t type) { return; }
+
+// okagv
+uint8_t PoseGraph3D::GetWorkingTrajectoryType() { return 0; }
+
+//okagv
+void PoseGraph3D::SetConstraintBuilderMinScore(double score) { return; }
+
+// okagv
+void PoseGraph3D::StopDrainWorkQueue() {}
+// okagv
+void PoseGraph3D::StartDrainWorkQueue(){}
+// okagv
+void PoseGraph3D::SetThreadPoolState(mapping::PoseGraphInterface::ThreadPoolState type){}
+// okagv
+mapping::PoseGraphInterface::ThreadPoolState PoseGraph3D::GetThreadPoolState() {
+  return mapping::PoseGraphInterface::ThreadPoolState::IDLE;
+}
+
+// okagv
+void PoseGraph3D::SetPoseGraphOption(proto::PoseGraphOptions& option_reset) {
+  return;
 }
 
 }  // namespace mapping

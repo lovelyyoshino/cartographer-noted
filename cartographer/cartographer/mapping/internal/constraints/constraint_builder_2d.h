@@ -21,7 +21,6 @@
 #include <deque>
 #include <functional>
 #include <limits>
-#include <map>
 #include <vector>
 
 #include "Eigen/Core"
@@ -62,7 +61,7 @@ class ConstraintBuilder2D {
   using Constraint = PoseGraphInterface::Constraint;
   using Result = std::vector<Constraint>;
 
-  ConstraintBuilder2D(const proto::ConstraintBuilderOptions& options,
+  ConstraintBuilder2D(proto::ConstraintBuilderOptions& options,
                       common::ThreadPoolInterface* thread_pool);
   ~ConstraintBuilder2D();
 
@@ -90,6 +89,22 @@ class ConstraintBuilder2D {
       const SubmapId& submap_id, const Submap2D* submap, const NodeId& node_id,
       const TrajectoryNode::Data* const constant_data);
 
+  //okagv
+  void MaybeAddGlobalRelocalizationConstraint(
+      const SubmapId& submap_id, const Submap2D* submap, const NodeId& node_id,
+      const TrajectoryNode::Data* const constant_data);
+
+  void MaybeAddRelocalizationConstraint(const SubmapId& submap_id, const Submap2D* submap,
+        const NodeId& node_id,
+        const TrajectoryNode::Data* const constant_data,
+        const transform::Rigid2d& initial_relative_pose);
+
+  //okagv
+  void MaybeAddNavigationConstraint(const SubmapId& submap_id, const Submap2D* submap,
+                          const NodeId& node_id,
+                          const TrajectoryNode::Data* const constant_data,
+                          const transform::Rigid2d& initial_relative_pose);
+
   // Must be called after all computations related to one node have been added.
   void NotifyEndOfNode();
 
@@ -105,6 +120,21 @@ class ConstraintBuilder2D {
   void DeleteScanMatcher(const SubmapId& submap_id);
 
   static void RegisterMetrics(metrics::FamilyFactory* family_factory);
+
+  //okagv
+  void GetMatchScore(double& score, bool& is_update);
+  //okagv
+  void SetMatchScore(double& score);
+  //okagv
+  void SetUpdateState(bool state);
+
+  //okagv 
+  double GetRelocalizationMatchScore();
+  //okagv
+  void SetRelocalizationMatchScore(double& score);
+
+  //okagv
+  void SetConstraintBuilderOptions(constraints::proto::ConstraintBuilderOptions& options_reset);
 
  private:
   struct SubmapScanMatcher {
@@ -133,7 +163,10 @@ class ConstraintBuilder2D {
 
   void RunWhenDoneCallback() LOCKS_EXCLUDED(mutex_);
 
-  const constraints::proto::ConstraintBuilderOptions options_;
+  //okagv
+  constraints::proto::ConstraintBuilderOptions options_;
+  //const constraints::proto::ConstraintBuilderOptions options_;
+
   common::ThreadPoolInterface* thread_pool_;
   absl::Mutex mutex_;
 
@@ -161,12 +194,31 @@ class ConstraintBuilder2D {
   // Map of dispatched or constructed scan matchers by 'submap_id'.
   std::map<SubmapId, SubmapScanMatcher> submap_scan_matchers_
       GUARDED_BY(mutex_);
-  std::map<SubmapId, common::FixedRatioSampler> per_submap_sampler_;
 
+  common::FixedRatioSampler sampler_;
   scan_matching::CeresScanMatcher2D ceres_scan_matcher_;
 
   // Histogram of scan matcher scores.
   common::Histogram score_histogram_ GUARDED_BY(mutex_);
+
+  //okagv
+  double covariance_score_ = 0.0;
+  bool is_score_update = false;
+  //okagv
+  common::Time last_match_time_ = common::Time::max();
+
+  //okagv
+  double relocalization_score_ = 0.0;
+
+  //okagv
+    void ComputeConstraintForRelocalization(const SubmapId& submap_id, const Submap2D* submap,
+                         const NodeId& node_id, bool match_full_submap,
+                         const TrajectoryNode::Data* const constant_data,
+                         const transform::Rigid2d& initial_relative_pose,
+                         const SubmapScanMatcher& submap_scan_matcher,
+                         std::unique_ptr<Constraint>* constraint)
+      LOCKS_EXCLUDED(mutex_);
+
 };
 
 }  // namespace constraints

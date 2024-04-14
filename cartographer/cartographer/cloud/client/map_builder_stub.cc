@@ -110,10 +110,8 @@ void MapBuilderStub::FinishTrajectory(int trajectory_id) {
   ::grpc::Status status;
   client.Write(request, &status);
   if (!status.ok()) {
-    LOG(ERROR) << "Failed to finish trajectory " 
-               << trajectory_id
-               << " for client_id " 
-               << client_id_ << ": "
+    LOG(ERROR) << "Failed to finish trajectory " << trajectory_id
+               << " for client_id " << client_id_ << ": "
                << status.error_message();
     return;
   }
@@ -174,13 +172,26 @@ bool MapBuilderStub::SerializeStateToFile(bool include_unfinished_submaps,
   return client.response().success();
 }
 
+// okagv
+bool MapBuilderStub::SerializeStateToFileAfterUpdate(
+    bool include_unfinished_submaps, const std::string& filename) {
+  return false;
+}
+
 std::map<int, int> MapBuilderStub::LoadState(
-    io::ProtoStreamReaderInterface* reader, const bool load_frozen_state) {
+    io::ProtoStreamReaderInterface* reader, 
+    const cartographer::mapping::PoseGraphInterface::TrajectoryState& state) {
   async_grpc::Client<handlers::LoadStateSignature> client(client_channel_);
   {
     proto::LoadStateRequest request;
     request.set_client_id(client_id_);
     CHECK(client.Write(request));
+  }
+
+  bool load_frozen_state = false;
+  if(state == cartographer::mapping::PoseGraphInterface::TrajectoryState::FROZEN)
+  {
+    load_frozen_state = true;
   }
 
   io::ProtoStreamDeserializer deserializer(reader);
@@ -223,10 +234,18 @@ std::map<int, int> MapBuilderStub::LoadState(
 }
 
 std::map<int, int> MapBuilderStub::LoadStateFromFile(
-    const std::string& filename, const bool load_frozen_state) {
+    const std::string& filename, 
+    const cartographer::mapping::PoseGraphInterface::TrajectoryState& state) {
   proto::LoadStateFromFileRequest request;
   request.set_file_path(filename);
   request.set_client_id(client_id_);
+
+  bool load_frozen_state = false;
+  if(state == cartographer::mapping::PoseGraphInterface::TrajectoryState::FROZEN)
+  {
+    load_frozen_state = true;
+  }
+
   request.set_load_frozen_state(load_frozen_state);
   async_grpc::Client<handlers::LoadStateFromFileSignature> client(
       client_channel_);
@@ -242,9 +261,58 @@ mapping::PoseGraphInterface* MapBuilderStub::pose_graph() {
   return pose_graph_stub_.get();
 }
 
-const std::vector<mapping::proto::TrajectoryBuilderOptionsWithSensorIds>&
+const std::map<int, mapping::proto::TrajectoryBuilderOptionsWithSensorIds>&
 MapBuilderStub::GetAllTrajectoryBuilderOptions() const {
   LOG(FATAL) << "Not implemented";
+}
+
+// okagv
+void MapBuilderStub::SetTrajectoryTypeWithId(TrajectoryType type, int id) {
+  current_trajectory_type_ = type;
+
+  switch (type)
+  {
+  case TrajectoryType::LOAD:
+      current_trajectory_id_ = id;
+      break;
+  case TrajectoryType::SLAM:
+      current_trajectory_id_ = id;
+      break;
+  case TrajectoryType::NAVIGATION:
+      current_trajectory_id_ = 1001;
+  default:
+    break;
+  }
+}
+
+TrajectoryType MapBuilderStub::GetTrajectoryTypeWithId(int id){
+      return TrajectoryType::IDLE;
+  }
+
+TrajectoryType MapBuilderStub::GetWorkingTrajectoryType() {
+            return TrajectoryType::IDLE;
+}
+
+// okagv
+void MapBuilderStub::DeleteTrajectory(int trajectory_id) { return; }
+
+bool MapBuilderStub::SerializeStateToFileWithId(int trajectory_id,
+                                                bool include_unfinished_submaps,
+                                                const std::string& filename) {
+  return true;
+}
+
+int MapBuilderStub::GetTrajectoryIdByName(std::string name) { return 0; }
+
+// okagv
+void MapBuilderStub::RegisterClientIdForTrajectory(const std::string& client_id,
+                                                   int trajectory_id) {
+  return;
+}
+
+void MapBuilderStub::SetMapBuilderOptions(
+    mapping::proto::MapBuilderOptions& option_reset) {
+  return;
 }
 
 }  // namespace cloud

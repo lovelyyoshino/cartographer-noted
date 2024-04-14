@@ -51,9 +51,8 @@ RosMapWritingPointsProcessor::FromDictionary(
 
 void RosMapWritingPointsProcessor::Process(
     std::unique_ptr<::cartographer::io::PointsBatch> batch) {
-  range_data_inserter_.Insert(
-      {batch->origin, ::cartographer::sensor::PointCloud(batch->points), {}},
-      &probability_grid_);
+  range_data_inserter_.Insert({batch->origin, batch->points, {}},
+                              &probability_grid_);
   next_->Process(std::move(batch));
 }
 
